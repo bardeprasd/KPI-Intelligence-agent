@@ -1315,8 +1315,9 @@ HTML_TEMPLATE = """
               <th>Value</th>
               <th>Unit</th>
               <th>Target</th>
+              <th>Delta</th>
               <th>Status</th>
-              <th>Trend / note</th>
+              <th>Comment</th>
             </tr>
           </thead>
           <tbody>
@@ -1327,6 +1328,13 @@ HTML_TEMPLATE = """
               <td class="value">{{ row.display_value }}</td>
               <td>{{ row.unit }}</td>
               <td class="target">{{ row.target_display or 'n/a' }}</td>
+              <td class="value">
+                {% if row.target is not none %}
+                {{ '%+.4f'|format(row.value - row.target) }}
+                {% else %}
+                n/a
+                {% endif %}
+              </td>
               <td class="status-cell"><span class="pill {{ row.status }}">{{ row.status.upper() }}</span></td>
               <td>{{ row.trend_note or 'Current-period view' }}</td>
             </tr>

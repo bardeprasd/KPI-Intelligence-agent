@@ -24,8 +24,6 @@ from agent.summarize import build_insights_risks_and_recommendations, summarize_
 
 
 load_dotenv(override=True)
-import os
-print("OPENAI_API_KEY starts with:", (os.getenv("OPENAI_API_KEY") or "")[:12])
 
 
 

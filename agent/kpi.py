@@ -426,6 +426,11 @@ def compute_inventory_kpis(
     avg_daily_issues = safe_divide(outbound_df["qty_shipped"].sum(), periods_in_month)
     avg_on_hand = float(df["on_hand_qty"].mean()) if not df.empty else 0.0
     inventory_turns = safe_divide(avg_daily_issues * 365, avg_on_hand)
+    top_stockout_row = None
+    if not df.empty:
+        stockout_rows = df.loc[df["stockout_flag"] > 0]
+        if not stockout_rows.empty:
+            top_stockout_row = stockout_rows.sort_values(["available_qty", "on_hand_qty"], ascending=[True, True]).iloc[0]
     if "unit_cost" in df.columns:
         aged_inventory_value = float(df.loc[df["age_days"] > 180, "on_hand_qty"].mul(df.loc[df["age_days"] > 180, "unit_cost"]).sum())
         aged_value_note = "Computed from on_hand_qty * unit_cost for inventory older than 180 days."
@@ -451,8 +456,12 @@ def compute_inventory_kpis(
         if evaluate_status(dos, THRESHOLDS["Days of Supply"]) == "green"
         else _generic_comment(dos, THRESHOLDS["Days of Supply"])
     )
-    stockout_comment = _generic_comment(stockout, THRESHOLDS["Stockout Exposure %"])
-    safety_stock_comment = _generic_comment(safety_coverage, THRESHOLDS["Safety Stock Coverage %"])
+    if top_stockout_row is not None:
+        stockout_comment = f"{top_stockout_row['part_number']} stock-out risk at {top_stockout_row['warehouse_id']}"
+        safety_stock_comment = f"{top_stockout_row['part_number']} is below safety stock at {top_stockout_row['warehouse_id']}"
+    else:
+        stockout_comment = _generic_comment(stockout, THRESHOLDS["Stockout Exposure %"])
+        safety_stock_comment = _generic_comment(safety_coverage, THRESHOLDS["Safety Stock Coverage %"])
     aged_pct_comment = _generic_comment(aged_pct, THRESHOLDS["Aged Inventory % (>180d)"])
     avg_age_comment = "Average inventory age across the selected scope"
 
@@ -503,11 +512,25 @@ def compute_warehouse_productivity_kpis(warehouse_df: pd.DataFrame, start: pd.Ti
     sla = df["sla_adherence_pct"].mean() if not df.empty else 0.0
     equip_util = df["equipment_utilization_pct"].mean() if not df.empty else 0.0
     touches = df["touches_per_order"].mean() if not df.empty else 0.0
-    lines_comment = _generic_comment(lines_per_hour, THRESHOLDS["Lines Picked per Labor-Hour"])
-    orders_per_hour_comment = _generic_comment(orders_per_hour, THRESHOLDS["Orders Processed per Labor-Hour"])
+    weakest_shift_row = None
+    if not df.empty:
+        weakest_shift_row = df.assign(
+            lines_per_hour_row=df["lines_picked"] / df["labor_hours"].replace(0, pd.NA),
+            orders_per_hour_row=df["orders_processed"] / df["labor_hours"].replace(0, pd.NA),
+        ).sort_values(["sla_adherence_pct", "lines_per_hour_row"], ascending=[True, True], na_position="last").iloc[0]
+    if weakest_shift_row is not None and pd.notna(weakest_shift_row.get("warehouse_id")):
+        lines_comment = f"{weakest_shift_row['warehouse_id']} {weakest_shift_row['shift']} shift throughput is below plan"
+        orders_per_hour_comment = f"{weakest_shift_row['warehouse_id']} {weakest_shift_row['shift']} shift order flow is below plan"
+        sla_comment = f"{weakest_shift_row['warehouse_id']} {weakest_shift_row['shift']} shift missed SLA commitments"
+    else:
+        lines_comment = _generic_comment(lines_per_hour, THRESHOLDS["Lines Picked per Labor-Hour"])
+        orders_per_hour_comment = _generic_comment(orders_per_hour, THRESHOLDS["Orders Processed per Labor-Hour"])
+        sla_comment = _generic_comment(sla, THRESHOLDS["SLA Adherence %"])
     orders_per_day_comment = "Average daily order volume processed"
-    sla_comment = _generic_comment(sla, THRESHOLDS["SLA Adherence %"])
-    equipment_comment = _generic_comment(equip_util, THRESHOLDS["Equipment Utilization %"])
+    if weakest_shift_row is not None and pd.notna(weakest_shift_row.get("equipment_utilization_pct")):
+        equipment_comment = f"Equipment utilization at {weakest_shift_row['warehouse_id']} averaged {weakest_shift_row['equipment_utilization_pct'] * 100:.1f}%"
+    else:
+        equipment_comment = _generic_comment(equip_util, THRESHOLDS["Equipment Utilization %"])
     touches_comment = _generic_comment(touches, THRESHOLDS["Touches per Order"])
 
     kpis = [
@@ -540,10 +563,26 @@ def compute_employee_productivity_kpis(employee_df: pd.DataFrame, start: pd.Time
     rework_rate = safe_divide(df["rework"].sum(), df["tasks_completed"].sum())
     overtime = safe_divide(df["overtime_hours"].sum(), (df["hours_worked"] + df["overtime_hours"]).sum())
     avg_tasks = df["tasks_completed"].mean() if not df.empty else 0.0
+    top_error_row = None
+    if not df.empty:
+        error_rows = df.loc[df["errors"] > 0].sort_values(["errors", "rework", "overtime_hours"], ascending=[False, False, False])
+        if not error_rows.empty:
+            top_error_row = error_rows.iloc[0]
+    high_overtime_row = None
+    if not df.empty:
+        overtime_rows = df.loc[df["overtime_hours"] > 0].sort_values(["overtime_hours", "errors"], ascending=[False, False])
+        if not overtime_rows.empty:
+            high_overtime_row = overtime_rows.iloc[0]
     picks_comment = _generic_comment(picks_per_hour, THRESHOLDS["Picks per Person per Hour"])
-    error_comment = _generic_comment(error_rate, THRESHOLDS["Error Rate %"])
+    if top_error_row is not None:
+        error_comment = f"{top_error_row['shift']} shift errors from {top_error_row['employee_id']}"
+    else:
+        error_comment = _generic_comment(error_rate, THRESHOLDS["Error Rate %"])
     rework_comment = _generic_comment(rework_rate, THRESHOLDS["Rework Rate %"])
-    overtime_comment = _generic_comment(overtime, THRESHOLDS["Overtime %"])
+    if high_overtime_row is not None:
+        overtime_comment = f"{high_overtime_row['shift']} shift overtime is highest for {high_overtime_row['employee_id']}"
+    else:
+        overtime_comment = _generic_comment(overtime, THRESHOLDS["Overtime %"])
     avg_tasks_comment = "Average task load per employee record"
 
     kpis = [

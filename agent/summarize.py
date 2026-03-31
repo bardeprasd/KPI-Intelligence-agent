@@ -41,6 +41,12 @@ def _first_matching(kpis: Dict[str, Dict], name: str) -> Dict:
     return kpis.get(name, {"value": 0.0, "display_value": "0", "status": "info"})
 
 
+def _kpi_note(kpis: Dict[str, Dict], name: str, fallback: str) -> str:
+    # Returns the computed KPI note when available, otherwise a fallback.
+    note = str(kpis.get(name, {}).get("note", "")).strip()
+    return note or fallback
+
+
 def summarize_sections(sections: List[Dict]) -> List[Dict]:
     # ================================
     # Function: summarize_sections
@@ -65,36 +71,45 @@ def summarize_sections(sections: List[Dict]) -> List[Dict]:
     overtime = _first_matching(flat, "Overtime %")
     errors = _first_matching(flat, "Error Rate %")
 
+    inbound_note = _kpi_note(flat, "Receipts On-Time %", "Inbound service is stable.")
+    outbound_note = _kpi_note(flat, "Fill Rate %", _kpi_note(flat, "OTIF %", "Outbound service is healthy."))
+    inventory_note = (
+        _kpi_note(flat, "Stockout Exposure %", "Inventory coverage is balanced.")
+        if stockout["status"] in {"amber", "red"}
+        else _kpi_note(flat, "Days of Supply", "Inventory coverage is balanced.")
+    )
+    warehouse_note = _kpi_note(flat, "Lines Picked per Labor-Hour", _kpi_note(flat, "Equipment Utilization %", "Warehouse throughput is broadly healthy."))
+    employee_note = _kpi_note(flat, "Error Rate %", _kpi_note(flat, "Overtime %", "Workforce productivity and quality are balanced."))
+
     insights_by_section = {
         "Inbound": (
             "Inbound service is stable."
             if inbound_ot["status"] == "green"
-            else f"Inbound timeliness is under target at {inbound_ot['display_value']}, increasing supplier receipt risk."
+            else f"{inbound_note}; engage supplier recovery on delayed receipts."
         ),
         "Outbound": (
             "Outbound service is healthy."
             if outbound_otif["status"] == "green" and backorder["status"] == "green"
-            else f"Outbound service is pressured by OTIF at {outbound_otif['display_value']} and backorder rate at {backorder['display_value']}."
+            else f"{outbound_note}; review fulfillment and replenishment priorities."
         ),
         "Inventory": (
             "Inventory coverage is balanced."
             if stockout["status"] == "green"
-            else f"Inventory risk is elevated with stockout exposure at {stockout['display_value']}."
+            else f"{inventory_note}; trigger targeted expedite or stock rebalance."
         ),
         "Warehouse Productivity": (
             "Warehouse throughput is broadly healthy."
             if lines_per_hour["status"] == "green" and orders_per_hour["status"] == "green" and sla["status"] == "green"
             else (
-                f"Warehouse throughput is under target, with lines per labor-hour at {lines_per_hour['display_value']}, "
-                f"orders per labor-hour at {orders_per_hour['display_value']}, and SLA adherence at {sla['display_value']}."
-                if any(kpi["status"] in {"amber", "red"} for kpi in [lines_per_hour, orders_per_hour, sla])
+                f"{warehouse_note}; rebalance labor or maintenance windows."
+                if any(kpi["status"] in {"amber", "red"} for kpi in [lines_per_hour, orders_per_hour, sla, equip])
                 else f"Warehouse operations need attention, with equipment utilization at {equip['display_value']}."
             )
         ),
         "Employee Productivity": (
             "Workforce productivity and quality are balanced."
             if overtime["status"] == "green" and errors["status"] == "green"
-            else f"Workforce pressure is visible, with overtime at {overtime['display_value']} and error rate at {errors['display_value']}."
+            else f"{employee_note}; add shift-level coaching or staffing support."
         ),
     }
 
@@ -121,29 +136,39 @@ def build_insights_risks_and_recommendations(sections: List[Dict]) -> Tuple[List
     risks: List[str] = []
     recommendations: List[str] = []
 
-    if kpis["Receipts On-Time %"]["status"] in {"amber", "red"} and kpis["OTIF %"]["status"] in {"amber", "red"}:
-        insights.append("Supply reliability is likely contributing to outbound service pressure because inbound timeliness and OTIF are both below target.")
+    inbound_note = _kpi_note(kpis, "Receipts On-Time %", "Inbound performance is stable")
+    outbound_note = _kpi_note(kpis, "Fill Rate %", _kpi_note(kpis, "OTIF %", "Outbound service is stable"))
+    inventory_note = (
+        _kpi_note(kpis, "Stockout Exposure %", "Inventory coverage is stable")
+        if kpis["Stockout Exposure %"]["status"] in {"amber", "red"} or kpis["Safety Stock Coverage %"]["status"] in {"amber", "red"}
+        else _kpi_note(kpis, "Days of Supply", "Inventory coverage is stable")
+    )
+    warehouse_note = _kpi_note(kpis, "Lines Picked per Labor-Hour", _kpi_note(kpis, "Equipment Utilization %", "Warehouse productivity is stable"))
+    employee_note = _kpi_note(kpis, "Error Rate %", _kpi_note(kpis, "Overtime %", "Employee productivity is stable"))
+
+    if kpis["Receipts On-Time %"]["status"] in {"amber", "red"}:
+        insights.append(f"Inbound: {inbound_note}; engage supplier capacity or recovery planning.")
         risks.append("Late inbound receipts are increasing the risk of continued outbound service misses.")
-        recommendations.append("Review late inbound receipts by supplier and expedite constrained part numbers that also appear in service-risk outbound orders.")
+        recommendations.append("Escalate late suppliers and expedite open receipt lines tied to service-risk parts.")
+
+    if kpis["Backorder Rate %"]["status"] in {"amber", "red"} or kpis["OTIF %"]["status"] in {"amber", "red"}:
+        insights.append(f"Outbound: {outbound_note}; review safety stock and order-priority settings.")
+        risks.append("Elevated backorders create immediate customer-service and fulfillment risk.")
+        recommendations.append("Prioritize the SKUs driving backorders and clear the most delayed customer orders first.")
 
     if kpis["Stockout Exposure %"]["status"] in {"amber", "red"} or kpis["Safety Stock Coverage %"]["status"] in {"amber", "red"}:
-        insights.append("Inventory resilience is weak, with stockout exposure and/or safety stock coverage outside target levels.")
+        insights.append(f"Inventory: {inventory_note}; trigger expedite or rebalance inventory.")
         risks.append("Inventory coverage gaps may continue to drive stockouts and service degradation.")
-        recommendations.append("Recalibrate reorder points and safety stock for SKUs driving stockout exposure, especially in the most constrained warehouses.")
+        recommendations.append("Recalibrate reorder points and safety stock for the highest-risk SKUs and constrained warehouses.")
 
-    if kpis["Backorder Rate %"]["status"] in {"amber", "red"}:
-        insights.append("Backorders are materially affecting service performance and should be treated as a customer-impacting issue.")
-        risks.append("Elevated backorders create immediate customer-service and fulfillment risk.")
-        recommendations.append("Prioritize root-cause analysis on backordered parts and align fulfillment, planning, and supplier recovery actions.")
+    if any(kpis[name]["status"] in {"amber", "red"} for name in ["Lines Picked per Labor-Hour", "Orders Processed per Labor-Hour", "SLA Adherence %", "Equipment Utilization %"]):
+        insights.append(f"Warehouse Productivity: {warehouse_note}; rebalance labor or maintenance windows.")
+        recommendations.append("Address the weakest warehouse throughput driver before adding broader process redesign.")
 
-    if kpis["Overtime %"]["status"] in {"amber", "red"} and kpis["Error Rate %"]["status"] in {"amber", "red"}:
-        insights.append("Elevated overtime together with quality errors suggests workforce strain may be increasing operational risk.")
+    if kpis["Overtime %"]["status"] in {"amber", "red"} or kpis["Error Rate %"]["status"] in {"amber", "red"}:
+        insights.append(f"Employee: {employee_note}; add refresher training or staffing support.")
         risks.append("Workforce strain may reduce quality and worsen operational stability if overtime remains elevated.")
-        recommendations.append("Rebalance shift staffing, review training needs, and monitor whether overtime reduction improves quality outcomes.")
-
-    if kpis["Lines Picked per Labor-Hour"]["status"] == "green" and kpis["OTIF %"]["status"] in {"amber", "red"}:
-        insights.append("Warehouse throughput is relatively stable, so service issues are more likely caused by supply or inventory constraints than floor productivity.")
-        recommendations.append("Focus corrective actions on supply availability and inventory positioning before redesigning warehouse labor processes.")
+        recommendations.append("Target the highest-error shift or employee cluster with training and overtime relief.")
 
     if not insights:
         insights.append("Overall performance is broadly stable, with no major domain simultaneously failing across service, inventory, and workforce metrics.")

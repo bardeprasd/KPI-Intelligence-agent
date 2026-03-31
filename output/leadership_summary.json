@@ -37,7 +37,7 @@
       "target": 14.0,
       "delta": -6.6616,
       "status": "red",
-      "comment": "Materially below target"
+      "comment": "WH-03 Night shift throughput is below plan"
     },
     {
       "name": "Error Rate %",
@@ -45,7 +45,7 @@
       "target": 0.01,
       "delta": 0.006,
       "status": "amber",
-      "comment": "Slightly above tolerance"
+      "comment": "Day shift errors from E-1107"
     }
   ]
 }

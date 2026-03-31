@@ -2,7 +2,7 @@
   "header": {
     "title": "Aftersales Operations KPI Intelligence Summary",
     "subtitle": "Executive view across inbound, outbound, inventory, warehouse, and workforce performance",
-    "generated_at": "2026-03-31T07:32:45.682932+00:00",
+    "generated_at": "2026-03-31T15:35:27.001408+00:00",
     "overall_status": "red",
     "warehouse_scope": [
       "All"
@@ -56,7 +56,7 @@
       "status": "red",
       "target": 14.0,
       "target_display": ">= 14.00",
-      "note": "Materially below target"
+      "note": "WH-03 Night shift throughput is below plan"
     },
     {
       "label": "Error Rate %",
@@ -66,7 +66,7 @@
       "status": "amber",
       "target": 0.01,
       "target_display": "<= 1.0%",
-      "note": "Slightly above tolerance"
+      "note": "Day shift errors from E-1107"
     }
   ],
   "sections": [
@@ -153,7 +153,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Inbound timeliness is critically low at 0.0%, raising supplier receipt risk."
+      "insight": "Late receipts and quantity discrepancies from Supplier A & Supplier C caused inbound performance failures."
     },
     {
       "name": "Outbound",
@@ -238,7 +238,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Outbound service is severely impacted by low OTIF at 5.4% and high backorder rate of 17.9%."
+      "insight": "Backorders on MN-5544 and late shipments on SO20092 & SO20124 severely impacted outbound fill rate and OTIF."
     },
     {
       "name": "Inventory",
@@ -267,7 +267,7 @@
           "formula": "SUM(stockout_flag) / COUNT(*)",
           "source_table": "inventory_snapshot",
           "grain": "reporting period",
-          "note": "Above tolerance"
+          "note": "CL-7781 stock-out risk at WH-02"
         },
         {
           "name": "Safety Stock Coverage %",
@@ -280,7 +280,7 @@
           "formula": "COUNT(available_qty >= safety_stock) / COUNT(*)",
           "source_table": "inventory_snapshot",
           "grain": "reporting period",
-          "note": "Materially below target"
+          "note": "CL-7781 is below safety stock at WH-02"
         },
         {
           "name": "Aged Inventory % (>180d)",
@@ -336,7 +336,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Inventory risk is high with stockout exposure at 53.2% and aged inventory over 51%."
+      "insight": "CL-7781 at WH-02 faces critical stock-out risk with low safety stock coverage and high aged inventory."
     },
     {
       "name": "Warehouse Productivity",
@@ -352,7 +352,7 @@
           "formula": "SUM(lines_picked) / SUM(labor_hours)",
           "source_table": "warehouse_productivity",
           "grain": "reporting period",
-          "note": "Materially below target"
+          "note": "WH-03 Night shift throughput is below plan"
         },
         {
           "name": "Orders Processed per Labor-Hour",
@@ -365,7 +365,7 @@
           "formula": "SUM(orders_processed) / SUM(labor_hours)",
           "source_table": "warehouse_productivity",
           "grain": "reporting period",
-          "note": "Materially below target"
+          "note": "WH-03 Night shift order flow is below plan"
         },
         {
           "name": "Orders per Day",
@@ -391,7 +391,7 @@
           "formula": "AVG(sla_adherence_pct)",
           "source_table": "warehouse_productivity",
           "grain": "reporting period",
-          "note": "Materially below target"
+          "note": "WH-03 Night shift missed SLA commitments"
         },
         {
           "name": "Equipment Utilization %",
@@ -404,7 +404,7 @@
           "formula": "AVG(equipment_utilization_pct)",
           "source_table": "warehouse_productivity",
           "grain": "reporting period",
-          "note": "Within tolerance"
+          "note": "Equipment utilization at WH-03 averaged 79.9%"
         },
         {
           "name": "Touches per Order",
@@ -421,7 +421,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Warehouse throughput is below target with low lines and orders per labor-hour and SLA adherence at 84.4%."
+      "insight": "WH-03 Night shift underperforms on throughput and SLA adherence despite adequate equipment utilization."
     },
     {
       "name": "Employee Productivity",
@@ -450,7 +450,7 @@
           "formula": "SUM(errors) / SUM(tasks_completed)",
           "source_table": "employee_productivity",
           "grain": "reporting period",
-          "note": "Slightly above tolerance"
+          "note": "Day shift errors from E-1107"
         },
         {
           "name": "Rework Rate %",
@@ -476,7 +476,7 @@
           "formula": "SUM(overtime_hours) / SUM(hours_worked + overtime_hours)",
           "source_table": "employee_productivity",
           "grain": "reporting period",
-          "note": "Above tolerance"
+          "note": "Day shift overtime is highest for E-1068"
         },
         {
           "name": "Average Tasks per Employee",
@@ -493,7 +493,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Employee productivity is pressured with overtime at 17.6% and error rate exceeding target."
+      "insight": "Day shift errors from employee E-1107 and high overtime for E-1068 indicate staffing and quality issues."
     }
   ],
   "kpi_table": [
@@ -649,7 +649,7 @@
       "target": 0.02,
       "target_display": "<= 2.0%",
       "status": "red",
-      "trend_note": "Above tolerance"
+      "trend_note": "CL-7781 stock-out risk at WH-02"
     },
     {
       "domain": "Inventory",
@@ -660,7 +660,7 @@
       "target": 0.95,
       "target_display": ">= 95.0%",
       "status": "red",
-      "trend_note": "Materially below target"
+      "trend_note": "CL-7781 is below safety stock at WH-02"
     },
     {
       "domain": "Inventory",
@@ -715,7 +715,7 @@
       "target": 14.0,
       "target_display": ">= 14.00",
       "status": "red",
-      "trend_note": "Materially below target"
+      "trend_note": "WH-03 Night shift throughput is below plan"
     },
     {
       "domain": "Warehouse Productivity",
@@ -726,7 +726,7 @@
       "target": 1.2,
       "target_display": ">= 1.20",
       "status": "red",
-      "trend_note": "Materially below target"
+      "trend_note": "WH-03 Night shift order flow is below plan"
     },
     {
       "domain": "Warehouse Productivity",
@@ -748,7 +748,7 @@
       "target": 0.95,
       "target_display": ">= 95.0%",
       "status": "red",
-      "trend_note": "Materially below target"
+      "trend_note": "WH-03 Night shift missed SLA commitments"
     },
     {
       "domain": "Warehouse Productivity",
@@ -759,7 +759,7 @@
       "target": 0.8,
       "target_display": "75.0% to 90.0%",
       "status": "green",
-      "trend_note": "Within tolerance"
+      "trend_note": "Equipment utilization at WH-03 averaged 79.9%"
     },
     {
       "domain": "Warehouse Productivity",
@@ -792,7 +792,7 @@
       "target": 0.01,
       "target_display": "<= 1.0%",
       "status": "amber",
-      "trend_note": "Slightly above tolerance"
+      "trend_note": "Day shift errors from E-1107"
     },
     {
       "domain": "Employee Productivity",
@@ -814,7 +814,7 @@
       "target": 0.08,
       "target_display": "<= 8.0%",
       "status": "red",
-      "trend_note": "Above tolerance"
+      "trend_note": "Day shift overtime is highest for E-1068"
     },
     {
       "domain": "Employee Productivity",
@@ -829,23 +829,23 @@
     }
   ],
   "insights": [
-    "Inbound receipts on-time are at 0.0%, well below the 95% target.",
-    "Outbound fill rate is 82.1%, missing the 95% goal.",
-    "Stockout exposure at 53.2% far exceeds the 2% target.",
-    "Lines picked per labor-hour are 7.34, below the 14.0 minimum.",
-    "Overtime is high at 17.6%, more than double the 8% limit."
+    "Inbound: Supplier A & Supplier C delays and discrepancies reduced on-time receipts to 0%.",
+    "Outbound: MN-5544 backorders at 17.9% lowered fill rate to 82.1%, below 95% target.",
+    "Inventory: CL-7781 stock-out exposure at 53.2% and safety stock coverage at 60.5% at WH-02 are critical.",
+    "Warehouse Productivity: WH-03 Night shift lines picked per labor-hour at 7.34 is half the 14.0 target.",
+    "Employee Productivity: Day shift error rate at 1.6% exceeds 1.0% target, driven by E-1107."
   ],
   "risks": [
     "Late inbound receipts are increasing the risk of continued outbound service misses.",
-    "Inventory coverage gaps may continue to drive stockouts and service degradation.",
-    "Elevated backorders create immediate customer-service and fulfillment risk."
+    "Elevated backorders create immediate customer-service and fulfillment risk.",
+    "Inventory coverage gaps may continue to drive stockouts and service degradation."
   ],
   "recommendations": [
-    "Prioritize improving supplier on-time receipts to reduce inbound delays.",
-    "Address outbound backorders and OTIF performance urgently.",
-    "Mitigate inventory risks by reducing stockout exposure and aged stock.",
-    "Enhance warehouse labor efficiency to meet throughput targets.",
-    "Manage workforce overtime and error rates to improve productivity."
+    "Inbound: Engage Supplier A & Supplier C to reduce late receipts and quantity mismatches.",
+    "Outbound: Prioritize fulfillment and replenishment for MN-5544 to reduce backorders.",
+    "Inventory: Expedite or rebalance stock for CL-7781 at WH-02 to mitigate stock-out risk.",
+    "Warehouse Productivity: Rebalance labor or adjust maintenance on WH-03 Night shift to improve throughput and SLA adherence.",
+    "Employee Productivity: Provide coaching or staffing support for E-1107 and manage overtime for E-1068."
   ],
   "metadata": {
     "source_files": [
@@ -870,7 +870,7 @@
     "generated_files": [
       "leadership_summary.json",
       "leadership_summary_detailed.json",
-      "kpi_summary_20260331_130245.xlsx",
+      "kpi_summary.xlsx",
       "run_summary.txt",
       "one_pager.html"
     ]

@@ -50,6 +50,9 @@ Return strict JSON with keys: section_insights, insights, recommendations.
 - section_insights must be a list of objects with keys: section, insight
 - insights must be a list of short strings
 - recommendations must be a list of short strings
+- Prefer the company assessment style: "Domain: concrete driver; action".
+- Reuse KPI notes when they already name the driver SKU, supplier, warehouse, order, employee, or shift.
+- Keep every bullet to one sentence and grounded in the supplied facts only.
 """
 
 
@@ -107,6 +110,7 @@ def generate_narrative_with_openai(
                         "display_value": kpi["display_value"],
                         "status": kpi["status"],
                         "target": kpi.get("target_display"),
+                        "note": kpi.get("note", ""),
                     }
                     for kpi in section["kpis"]
                 ],
@@ -118,8 +122,10 @@ def generate_narrative_with_openai(
         "constraints": [
             "Do not add new facts or numbers.",
             "Base every statement only on the supplied KPI values, statuses, and targets.",
+            "When a KPI note names a supplier, SKU, warehouse, order, employee, or shift, prefer using that note as the concrete driver.",
             "Keep each section insight to one short sentence.",
             "Keep each bullet short and executive-friendly.",
+            "Mirror the style 'Domain: driver; action' when possible.",
             f"Return exactly one section insight per section and at most {max_items} top insights and {max_items} recommendations.",
         ],
         "sections": section_snapshot,

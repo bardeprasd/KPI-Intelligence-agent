@@ -13,8 +13,8 @@ Summary cards:
 
 Top risks:
 - Late inbound receipts are increasing the risk of continued outbound service misses.
-- Inventory coverage gaps may continue to drive stockouts and service degradation.
 - Elevated backorders create immediate customer-service and fulfillment risk.
+- Inventory coverage gaps may continue to drive stockouts and service degradation.
 
 Validation warnings:
 - outbound_parts: 188 potential outliers detected in 'fill_rate' using IQR bounds.

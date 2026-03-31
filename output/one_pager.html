@@ -779,7 +779,7 @@
         </div>
         <div class="meta-tile">
           <div class="meta-label">Generated At</div>
-          <div class="meta-value">2026-03-31T07:32:45.682932+00:00</div>
+          <div class="meta-value">2026-03-31T15:35:27.001408+00:00</div>
         </div>
       </div>
     </section>
@@ -837,7 +837,7 @@
         <div class="card-footer">
           <div class="card-target"><strong>Target:</strong> >= 14.00</div>
           
-          <div class="card-note"><strong>Note:</strong> Materially below target</div>
+          <div class="card-note"><strong>Note:</strong> WH-03 Night shift throughput is below plan</div>
           
         </div>
       </article>
@@ -851,7 +851,7 @@
         <div class="card-footer">
           <div class="card-target"><strong>Target:</strong> <= 1.0%</div>
           
-          <div class="card-note"><strong>Note:</strong> Slightly above tolerance</div>
+          <div class="card-note"><strong>Note:</strong> Day shift errors from E-1107</div>
           
         </div>
       </article>
@@ -924,7 +924,7 @@
                 </span>
                 
               </div>
-              Inbound timeliness is critically low at 0.0%, raising supplier receipt risk.
+              Late receipts and quantity discrepancies from Supplier A & Supplier C caused inbound performance failures.
             </div>
           </article>
           
@@ -984,7 +984,7 @@
                 </span>
                 
               </div>
-              Outbound service is severely impacted by low OTIF at 5.4% and high backorder rate of 17.9%.
+              Backorders on MN-5544 and late shipments on SO20092 & SO20124 severely impacted outbound fill rate and OTIF.
             </div>
           </article>
           
@@ -1050,7 +1050,7 @@
                 </span>
                 
               </div>
-              Inventory risk is high with stockout exposure at 53.2% and aged inventory over 51%.
+              CL-7781 at WH-02 faces critical stock-out risk with low safety stock coverage and high aged inventory.
             </div>
           </article>
           
@@ -1110,7 +1110,7 @@
                 </span>
                 
               </div>
-              Warehouse throughput is below target with low lines and orders per labor-hour and SLA adherence at 84.4%.
+              WH-03 Night shift underperforms on throughput and SLA adherence despite adequate equipment utilization.
             </div>
           </article>
           
@@ -1164,7 +1164,7 @@
                 </span>
                 
               </div>
-              Employee productivity is pressured with overtime at 17.6% and error rate exceeding target.
+              Day shift errors from employee E-1107 and high overtime for E-1068 indicate staffing and quality issues.
             </div>
           </article>
           
@@ -1191,15 +1191,15 @@
           </div>
           <ul class="decision-list">
             
-            <li>Inbound receipts on-time are at 0.0%, well below the 95% target.</li>
+            <li>Inbound: Supplier A & Supplier C delays and discrepancies reduced on-time receipts to 0%.</li>
             
-            <li>Outbound fill rate is 82.1%, missing the 95% goal.</li>
+            <li>Outbound: MN-5544 backorders at 17.9% lowered fill rate to 82.1%, below 95% target.</li>
             
-            <li>Stockout exposure at 53.2% far exceeds the 2% target.</li>
+            <li>Inventory: CL-7781 stock-out exposure at 53.2% and safety stock coverage at 60.5% at WH-02 are critical.</li>
             
-            <li>Lines picked per labor-hour are 7.34, below the 14.0 minimum.</li>
+            <li>Warehouse Productivity: WH-03 Night shift lines picked per labor-hour at 7.34 is half the 14.0 target.</li>
             
-            <li>Overtime is high at 17.6%, more than double the 8% limit.</li>
+            <li>Employee Productivity: Day shift error rate at 1.6% exceeds 1.0% target, driven by E-1107.</li>
             
           </ul>
         </section>
@@ -1218,9 +1218,9 @@
             
             <li>Late inbound receipts are increasing the risk of continued outbound service misses.</li>
             
-            <li>Inventory coverage gaps may continue to drive stockouts and service degradation.</li>
-            
             <li>Elevated backorders create immediate customer-service and fulfillment risk.</li>
+            
+            <li>Inventory coverage gaps may continue to drive stockouts and service degradation.</li>
             
           </ul>
         </section>
@@ -1244,15 +1244,15 @@
           </div>
           <ul class="decision-list">
             
-            <li>Prioritize improving supplier on-time receipts to reduce inbound delays.</li>
+            <li>Inbound: Engage Supplier A & Supplier C to reduce late receipts and quantity mismatches.</li>
             
-            <li>Address outbound backorders and OTIF performance urgently.</li>
+            <li>Outbound: Prioritize fulfillment and replenishment for MN-5544 to reduce backorders.</li>
             
-            <li>Mitigate inventory risks by reducing stockout exposure and aged stock.</li>
+            <li>Inventory: Expedite or rebalance stock for CL-7781 at WH-02 to mitigate stock-out risk.</li>
             
-            <li>Enhance warehouse labor efficiency to meet throughput targets.</li>
+            <li>Warehouse Productivity: Rebalance labor or adjust maintenance on WH-03 Night shift to improve throughput and SLA adherence.</li>
             
-            <li>Manage workforce overtime and error rates to improve productivity.</li>
+            <li>Employee Productivity: Provide coaching or staffing support for E-1107 and manage overtime for E-1068.</li>
             
           </ul>
        
@@ -1276,8 +1276,9 @@
               <th>Value</th>
               <th>Unit</th>
               <th>Target</th>
+              <th>Delta</th>
               <th>Status</th>
-              <th>Trend / note</th>
+              <th>Comment</th>
             </tr>
           </thead>
           <tbody>
@@ -1288,6 +1289,11 @@
               <td class="value">6.3 days</td>
               <td>days</td>
               <td class="target"><= 5.00</td>
+              <td class="value">
+                
+                +1.3415
+                
+              </td>
               <td class="status-cell"><span class="pill amber">AMBER</span></td>
               <td>Slightly above tolerance</td>
             </tr>
@@ -1298,6 +1304,11 @@
               <td class="value">0.0%</td>
               <td>pct</td>
               <td class="target">>= 95.0%</td>
+              <td class="value">
+                
+                -0.9500
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>Late receipts from Supplier A & Supplier C reduced on-time performance</td>
             </tr>
@@ -1308,6 +1319,11 @@
               <td class="value">7.8%</td>
               <td>pct</td>
               <td class="target"><= 2.0%</td>
+              <td class="value">
+                
+                +0.0576
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>Mismatch volume is concentrated with Supplier A & Supplier C</td>
             </tr>
@@ -1318,6 +1334,11 @@
               <td class="value">26,454</td>
               <td>qty</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Inbound volume processed in the selected period</td>
             </tr>
@@ -1328,6 +1349,11 @@
               <td class="value">123</td>
               <td>count</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Late receipts concentrated across Supplier A & Supplier C</td>
             </tr>
@@ -1338,6 +1364,11 @@
               <td class="value">Supplier A (9,900), Supplier C (9,630), Supplier B (9,149)</td>
               <td>text</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Ranked by late ordered quantity in the selected period.</td>
             </tr>
@@ -1348,6 +1379,11 @@
               <td class="value">82.1%</td>
               <td>pct</td>
               <td class="target">>= 95.0%</td>
+              <td class="value">
+                
+                -0.1287
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>MN-5544 backorders impacted fill rate</td>
             </tr>
@@ -1358,6 +1394,11 @@
               <td class="value">5.4%</td>
               <td>pct</td>
               <td class="target">>= 92.0%</td>
+              <td class="value">
+                
+                -0.8662
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>Late shipments on SO20092 & SO20124</td>
             </tr>
@@ -1368,6 +1409,11 @@
               <td class="value">17.9%</td>
               <td>pct</td>
               <td class="target"><= 3.0%</td>
+              <td class="value">
+                
+                +0.1487
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>Backorders concentrated in MN-5544 & BR-2208</td>
             </tr>
@@ -1378,6 +1424,11 @@
               <td class="value">1,747</td>
               <td>qty</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Outbound volume shipped in the selected period</td>
             </tr>
@@ -1388,6 +1439,11 @@
               <td class="value">55</td>
               <td>count</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Late shipments include SO20092 & SO20124</td>
             </tr>
@@ -1398,6 +1454,11 @@
               <td class="value">MN-5544 (91), BR-2208 (85), CL-7781 (73), ZX-9910 (70), AX-4312 (61)</td>
               <td>text</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Ranked by backordered quantity in the selected period.</td>
             </tr>
@@ -1408,6 +1469,11 @@
               <td class="value">44.3 days</td>
               <td>days</td>
               <td class="target">20.0 to 45.0</td>
+              <td class="value">
+                
+                +14.2581
+                
+              </td>
               <td class="status-cell"><span class="pill green">GREEN</span></td>
               <td>Healthy for BR-2208</td>
             </tr>
@@ -1418,8 +1484,13 @@
               <td class="value">53.2%</td>
               <td>pct</td>
               <td class="target"><= 2.0%</td>
+              <td class="value">
+                
+                +0.5123
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Above tolerance</td>
+              <td>CL-7781 stock-out risk at WH-02</td>
             </tr>
             
             <tr>
@@ -1428,8 +1499,13 @@
               <td class="value">60.5%</td>
               <td>pct</td>
               <td class="target">>= 95.0%</td>
+              <td class="value">
+                
+                -0.3452
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Materially below target</td>
+              <td>CL-7781 is below safety stock at WH-02</td>
             </tr>
             
             <tr>
@@ -1438,6 +1514,11 @@
               <td class="value">51.6%</td>
               <td>pct</td>
               <td class="target"><= 15.0%</td>
+              <td class="value">
+                
+                +0.3661
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
               <td>Above tolerance</td>
             </tr>
@@ -1448,6 +1529,11 @@
               <td class="value">175.5 days</td>
               <td>days</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Average inventory age across the selected scope</td>
             </tr>
@@ -1458,6 +1544,11 @@
               <td class="value">79.90</td>
               <td>rate</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Proxy uses annualized shipped quantity over average on-hand quantity because finance valuation fields are not present.</td>
             </tr>
@@ -1468,6 +1559,11 @@
               <td class="value">17,754</td>
               <td>qty</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Proxy uses aged on-hand quantity because unit_cost is not present in the current data model.</td>
             </tr>
@@ -1478,8 +1574,13 @@
               <td class="value">7.34</td>
               <td>rate</td>
               <td class="target">>= 14.00</td>
+              <td class="value">
+                
+                -6.6616
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Materially below target</td>
+              <td>WH-03 Night shift throughput is below plan</td>
             </tr>
             
             <tr>
@@ -1488,8 +1589,13 @@
               <td class="value">0.97</td>
               <td>rate</td>
               <td class="target">>= 1.20</td>
+              <td class="value">
+                
+                -0.2261
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Materially below target</td>
+              <td>WH-03 Night shift order flow is below plan</td>
             </tr>
             
             <tr>
@@ -1498,6 +1604,11 @@
               <td class="value">1422.35</td>
               <td>rate</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Average daily order volume processed</td>
             </tr>
@@ -1508,8 +1619,13 @@
               <td class="value">84.4%</td>
               <td>pct</td>
               <td class="target">>= 95.0%</td>
+              <td class="value">
+                
+                -0.1065
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Materially below target</td>
+              <td>WH-03 Night shift missed SLA commitments</td>
             </tr>
             
             <tr>
@@ -1518,8 +1634,13 @@
               <td class="value">79.7%</td>
               <td>pct</td>
               <td class="target">75.0% to 90.0%</td>
+              <td class="value">
+                
+                -0.0027
+                
+              </td>
               <td class="status-cell"><span class="pill green">GREEN</span></td>
-              <td>Within tolerance</td>
+              <td>Equipment utilization at WH-03 averaged 79.9%</td>
             </tr>
             
             <tr>
@@ -1528,6 +1649,11 @@
               <td class="value">3.49</td>
               <td>rate</td>
               <td class="target"><= 3.50</td>
+              <td class="value">
+                
+                -0.0105
+                
+              </td>
               <td class="status-cell"><span class="pill green">GREEN</span></td>
               <td>Within tolerance</td>
             </tr>
@@ -1538,6 +1664,11 @@
               <td class="value">13.58</td>
               <td>rate</td>
               <td class="target">>= 14.00</td>
+              <td class="value">
+                
+                -0.4211
+                
+              </td>
               <td class="status-cell"><span class="pill amber">AMBER</span></td>
               <td>Slightly below target</td>
             </tr>
@@ -1548,8 +1679,13 @@
               <td class="value">1.6%</td>
               <td>pct</td>
               <td class="target"><= 1.0%</td>
+              <td class="value">
+                
+                +0.0060
+                
+              </td>
               <td class="status-cell"><span class="pill amber">AMBER</span></td>
-              <td>Slightly above tolerance</td>
+              <td>Day shift errors from E-1107</td>
             </tr>
             
             <tr>
@@ -1558,6 +1694,11 @@
               <td class="value">0.8%</td>
               <td>pct</td>
               <td class="target"><= 1.5%</td>
+              <td class="value">
+                
+                -0.0069
+                
+              </td>
               <td class="status-cell"><span class="pill green">GREEN</span></td>
               <td>Within tolerance</td>
             </tr>
@@ -1568,8 +1709,13 @@
               <td class="value">17.6%</td>
               <td>pct</td>
               <td class="target"><= 8.0%</td>
+              <td class="value">
+                
+                +0.0956
+                
+              </td>
               <td class="status-cell"><span class="pill red">RED</span></td>
-              <td>Above tolerance</td>
+              <td>Day shift overtime is highest for E-1068</td>
             </tr>
             
             <tr>
@@ -1578,6 +1724,11 @@
               <td class="value">125</td>
               <td>count</td>
               <td class="target">n/a</td>
+              <td class="value">
+                
+                n/a
+                
+              </td>
               <td class="status-cell"><span class="pill info">INFO</span></td>
               <td>Average task load per employee record</td>
             </tr>
