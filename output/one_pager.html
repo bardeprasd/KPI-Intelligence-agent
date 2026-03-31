@@ -1,0 +1,1595 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aftersales Operations KPI Intelligence Summary</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --bg-deep: #e3eaf1;
+      --surface-strong: #ffffff;
+      --text: #142233;
+      --text-strong: #0c1726;
+      --muted: #617186;
+      --muted-strong: #445468;
+      --border: rgba(19, 35, 56, 0.1);
+      --accent: #274c77;
+      --green: #26775a;
+      --green-soft: rgba(38, 119, 90, 0.12);
+      --amber: #a66a17;
+      --amber-soft: rgba(166, 106, 23, 0.12);
+      --red: #b23a31;
+      --red-soft: rgba(178, 58, 49, 0.12);
+      --info: #37648d;
+      --info-soft: rgba(55, 100, 141, 0.12);
+      --hero-start: #122438;
+      --hero-end: #1b3651;
+      --radius-lg: 28px;
+      --space-3: 16px;
+      --space-4: 22px;
+      --space-5: 28px;
+      --space-6: 36px;
+      --shadow-sm: 0 8px 22px rgba(13, 26, 42, 0.06);
+      --shadow-md: 0 18px 44px rgba(13, 26, 42, 0.1);
+      --shadow-lg: 0 28px 64px rgba(10, 18, 31, 0.14);
+      --font-ui: "Aptos", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 34%),
+        linear-gradient(180deg, #f5f7fa 0%, #eef2f6 38%, #e3eaf1 100%);
+      color: var(--text);
+      font-family: var(--font-ui);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42)),
+        linear-gradient(90deg, rgba(19, 35, 56, 0.02) 1px, transparent 1px),
+        linear-gradient(rgba(19, 35, 56, 0.02) 1px, transparent 1px);
+      background-size: auto, 72px 72px, 72px 72px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.24), transparent 85%);
+    }
+
+    .page {
+      width: min(1480px, calc(100vw - 64px));
+      margin: 12px auto 28px;
+      display: grid;
+      gap: var(--space-5);
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      color: #f5f8fc;
+      background:
+        radial-gradient(circle at 85% 22%, rgba(128, 183, 255, 0.24), rgba(128, 183, 255, 0) 26%),
+        radial-gradient(circle at 20% 120%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 24%),
+        linear-gradient(135deg, var(--hero-start) 0%, var(--hero-end) 62%, #244969 100%);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      isolation: isolate;
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    .hero::before {
+      width: 420px;
+      height: 420px;
+      right: -120px;
+      top: -160px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 68%);
+    }
+
+    .hero::after {
+      width: 520px;
+      height: 520px;
+      left: -240px;
+      bottom: -360px;
+      background: radial-gradient(circle, rgba(102, 151, 205, 0.22) 0%, rgba(102, 151, 205, 0) 72%);
+    }
+
+    .hero-top,
+    .hero-metadata {
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .hero-copy { max-width: 1120px; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(245, 248, 252, 0.8);
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 42px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 4.4vw, 64px);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .subtitle {
+      margin-top: 16px;
+      max-width: 980px;
+      color: rgba(245, 248, 252, 0.78);
+      font-size: 19px;
+      line-height: 1.55;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 999px;
+      padding: 14px 18px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+      backdrop-filter: blur(14px);
+    }
+
+    .status-badge::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+    }
+
+    .status-badge.red { color: #ffb4ad; }
+    .status-badge.amber { color: #ffd597; }
+    .status-badge.green { color: #aae4ca; }
+    .status-badge.info { color: #b9d8f1; }
+
+    .hero-metadata {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(220px, 1fr));
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+
+    .meta-tile {
+      min-height: 122px;
+      padding: 18px 18px 20px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+    }
+
+    .meta-label {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: rgba(245, 248, 252, 0.62);
+      margin-bottom: 12px;
+    }
+
+    .meta-value {
+      font-size: 17px;
+      line-height: 1.5;
+      font-weight: 700;
+      color: #ffffff;
+      word-break: break-word;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(240px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .summary-card,
+    .panel,
+    .table-panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, var(--surface-strong) 100%);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+    }
+
+    .summary-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 224px;
+      padding: 22px 20px;
+      border-radius: 22px;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: var(--space-3);
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 5px;
+      background: linear-gradient(90deg, var(--accent) 0%, rgba(39, 76, 119, 0.45) 100%);
+    }
+
+    .summary-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -28px -44px auto;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(39, 76, 119, 0.08) 0%, rgba(39, 76, 119, 0) 68%);
+      pointer-events: none;
+    }
+
+    .summary-card.red::before { background: linear-gradient(90deg, var(--red) 0%, rgba(178, 58, 49, 0.35) 100%); }
+    .summary-card.amber::before { background: linear-gradient(90deg, var(--amber) 0%, rgba(166, 106, 23, 0.35) 100%); }
+    .summary-card.green::before { background: linear-gradient(90deg, var(--green) 0%, rgba(38, 119, 90, 0.35) 100%); }
+    .summary-card.info::before { background: linear-gradient(90deg, var(--info) 0%, rgba(55, 100, 141, 0.35) 100%); }
+    .summary-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      align-items: flex-start;
+    }
+
+    .card-label {
+      font-size: 13px;
+      line-height: 1.45;
+      letter-spacing: 0.03em;
+      color: var(--muted-strong);
+      font-weight: 800;
+      text-transform: uppercase;
+      max-width: 78%;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 10px;
+      line-height: 1;
+      letter-spacing: 0.11em;
+      font-weight: 800;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .pill.red { background: var(--red-soft); color: var(--red); border-color: rgba(178, 58, 49, 0.18); }
+    .pill.amber { background: var(--amber-soft); color: var(--amber); border-color: rgba(166, 106, 23, 0.18); }
+    .pill.green { background: var(--green-soft); color: var(--green); border-color: rgba(38, 119, 90, 0.18); }
+    .pill.info { background: var(--info-soft); color: var(--info); border-color: rgba(55, 100, 141, 0.18); }
+
+    .card-value {
+      font-size: clamp(42px, 3.4vw, 56px);
+      line-height: 1;
+      letter-spacing: -0.05em;
+      font-weight: 800;
+      color: var(--text-strong);
+    }
+
+    .card-footer {
+      align-self: end;
+      display: grid;
+      gap: 10px;
+      padding-top: 4px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .card-target,
+    .card-note {
+      padding-top: 10px;
+      border-top: 1px solid rgba(19, 35, 56, 0.08);
+    }
+
+    .card-target strong,
+    .card-note strong { color: var(--text); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.9fr) minmax(420px, 0.95fr);
+      gap: var(--space-5);
+      align-items: start;
+    }
+
+    .panel,
+    .table-panel {
+      border-radius: 24px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid rgba(19, 35, 56, 0.08);
+      background: linear-gradient(180deg, rgba(246, 249, 252, 0.95) 0%, rgba(255, 255, 255, 0.75) 100%);
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-strong);
+    }
+
+    .panel-subtitle {
+      margin-top: 6px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+      max-width: 720px;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(360px, 1fr));
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.6) 0%, rgba(255, 255, 255, 0) 100%);
+    }
+
+    .section-card {
+      position: relative;
+      min-height: 328px;
+      padding: 22px;
+      border-radius: 22px;
+      border: 1px solid rgba(19, 35, 56, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 100%);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .section-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--accent);
+    }
+
+    .section-card::after {
+      content: "";
+      position: absolute;
+      right: -26px;
+      top: -26px;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(39, 76, 119, 0.08) 0%, rgba(39, 76, 119, 0) 72%);
+      pointer-events: none;
+    }
+
+    .section-card.red::before { background: var(--red); }
+    .section-card.amber::before { background: var(--amber); }
+    .section-card.green::before { background: var(--green); }
+    .section-card.info::before { background: var(--info); }
+
+    .section-top {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      align-items: flex-start;
+      margin-bottom: var(--space-3);
+      padding-left: 6px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--text-strong);
+      letter-spacing: -0.02em;
+    }
+
+    .metric-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 14px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 13px 14px;
+      border-radius: 16px;
+      background: rgba(246, 249, 252, 0.78);
+      border: 1px solid rgba(19, 35, 56, 0.06);
+      font-size: 13px;
+    }
+
+    .metric-name {
+      color: var(--muted-strong);
+      line-height: 1.5;
+      font-weight: 600;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value {
+      font-weight: 800;
+      color: var(--text-strong);
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+      text-align: right;
+      max-width: 100%;
+    }
+
+    .metric-row-text {
+      grid-template-columns: 14px minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .metric-row-text .metric-value {
+      grid-column: 2;
+      white-space: normal;
+      text-align: left;
+      line-height: 1.6;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      padding-top: 2px;
+    }
+
+    .metric-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 0 5px transparent;
+    }
+
+    .metric-dot.red { background: var(--red); box-shadow: 0 0 0 5px rgba(178, 58, 49, 0.12); }
+    .metric-dot.amber { background: var(--amber); box-shadow: 0 0 0 5px rgba(166, 106, 23, 0.12); }
+    .metric-dot.green { background: var(--green); box-shadow: 0 0 0 5px rgba(38, 119, 90, 0.12); }
+    .metric-dot.info { background: var(--info); box-shadow: 0 0 0 5px rgba(55, 100, 141, 0.12); }
+
+    .section-insight {
+      margin-top: 14px;
+      padding: 14px 15px;
+      border-radius: 18px;
+      border: 1px solid rgba(80, 112, 146, 0.18);
+      background: linear-gradient(180deg, rgba(249, 252, 255, 0.98) 0%, rgba(241, 247, 253, 0.92) 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--muted-strong);
+    }
+
+    .narrative-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .section-insight strong {
+      display: inline-block;
+      margin: 0;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(80, 112, 146, 0.2);
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--info);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .ai-badge svg {
+      width: 12px;
+      height: 12px;
+      flex: 0 0 auto;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(19, 35, 56, 0.14);
+      background: rgba(255, 255, 255, 0.75);
+      color: var(--text-strong);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .decision-stack {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .decision-card { padding-bottom: var(--space-4); }
+
+    .decision-card.insights {
+      background:
+        radial-gradient(circle at top right, rgba(55, 100, 141, 0.08), rgba(55, 100, 141, 0) 36%),
+        linear-gradient(180deg, rgba(252, 253, 255, 0.98) 0%, rgba(245, 249, 253, 0.96) 100%);
+    }
+
+    .decision-card.actions {
+      background:
+        radial-gradient(circle at top right, rgba(166, 106, 23, 0.09), rgba(166, 106, 23, 0) 36%),
+        linear-gradient(180deg, rgba(255, 254, 251, 0.98) 0%, rgba(252, 247, 239, 0.96) 100%);
+    }
+
+    .decision-card.risks {
+      background:
+        radial-gradient(circle at top right, rgba(178, 58, 49, 0.09), rgba(178, 58, 49, 0) 36%),
+        linear-gradient(180deg, rgba(255, 252, 252, 0.98) 0%, rgba(252, 243, 242, 0.96) 100%);
+    }
+
+    .decision-list {
+      list-style: none;
+      margin: 0;
+      padding: var(--space-4) var(--space-5) 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .decision-list li {
+      position: relative;
+      padding: 16px 18px 16px 20px;
+      border-radius: 18px;
+      border: 1px solid rgba(19, 35, 56, 0.08);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .decision-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 12px;
+      bottom: 12px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .decision-card.actions .decision-list li::before { background: var(--amber); }
+    .decision-card.risks .decision-list li::before { background: var(--red); }
+
+    .ai-footnote {
+      margin: 14px var(--space-5) 0;
+      padding-top: 12px;
+      border-top: 1px solid rgba(19, 35, 56, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .ai-footnote .ai-badge { flex: 0 0 auto; }
+
+    .table-panel { position: relative; }
+
+    .table-wrap {
+      padding: 0 var(--space-4) var(--space-4);
+      overflow-x: auto;
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.58) 0%, rgba(255, 255, 255, 0) 100%);
+    }
+
+    table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    th, td {
+      text-align: left;
+      padding: 13px 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid rgba(19, 35, 56, 0.08);
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      background: rgba(242, 246, 250, 0.96);
+      backdrop-filter: blur(8px);
+      font-weight: 800;
+      box-shadow: inset 0 -1px 0 rgba(19, 35, 56, 0.08);
+    }
+
+    tbody tr:nth-child(even) td { background: rgba(248, 250, 252, 0.62); }
+    tbody tr:hover td { background: rgba(239, 245, 250, 0.95); }
+    tbody tr:last-child td { border-bottom: none; }
+    td:first-child { font-weight: 700; color: var(--muted-strong); }
+    td.value { font-weight: 800; color: var(--text-strong); }
+    td.value, td.target, td.status-cell { white-space: nowrap; }
+
+    .footer-note {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .footer-note strong { color: var(--muted-strong); }
+
+    @media (max-width: 1320px) {
+      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 960px) {
+      .page { width: min(100% - 28px, 1880px); margin-top: 16px; gap: var(--space-4); }
+      .hero { padding: var(--space-5); }
+      .hero-top { grid-template-columns: 1fr; }
+      .hero-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .page { width: calc(100% - 16px); }
+      .hero, .panel-header, .decision-list, .table-wrap { padding-left: var(--space-3); padding-right: var(--space-3); }
+      .hero { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+      .hero-metadata, .summary-grid { grid-template-columns: 1fr; }
+      .meta-tile, .summary-card, .section-card { border-radius: 18px; }
+      .section-card { min-height: auto; }
+      .metric-row { grid-template-columns: 14px minmax(0, 1fr); }
+      .metric-value { grid-column: 2; }
+      .ai-footnote, .footer-note { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <div class="eyebrow">KPI Intelligence Agent</div>
+          <h1>Aftersales Operations KPI Intelligence Summary</h1>
+          <div class="subtitle">Executive view across inbound, outbound, inventory, warehouse, and workforce performance</div>        </div>
+        <div class="status-badge red">RED Overall Status</div>
+      </div>
+      <div class="hero-metadata">
+        <div class="meta-tile">
+          <div class="meta-label">Reporting Period</div>
+          <div class="meta-value">
+            February 2026<br />
+            2026-02-01 to 2026-02-28
+          </div>
+        </div>
+        <div class="meta-tile">
+          <div class="meta-label">Warehouse Scope</div>
+          <div class="meta-value">All</div>
+        </div>
+        <div class="meta-tile">
+          <div class="meta-label">SKU Family Scope</div>
+          <div class="meta-value">All</div>
+        </div>
+        <div class="meta-tile">
+          <div class="meta-label">Calculation Version</div>
+          <div class="meta-value">v1.0.0</div>
+        </div>
+        <div class="meta-tile">
+          <div class="meta-label">Generated At</div>
+          <div class="meta-value">2026-03-31T07:32:45.682932+00:00</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-grid">
+      
+      <article class="summary-card red">
+        <div class="card-top">
+          <div class="card-label">Fill Rate %</div>
+          <div class="pill red">RED</div>
+        </div>
+        <div class="card-value">82.1%</div>
+        <div class="card-footer">
+          <div class="card-target"><strong>Target:</strong> >= 95.0%</div>
+          
+          <div class="card-note"><strong>Note:</strong> MN-5544 backorders impacted fill rate</div>
+          
+        </div>
+      </article>
+      
+      <article class="summary-card red">
+        <div class="card-top">
+          <div class="card-label">OTIF %</div>
+          <div class="pill red">RED</div>
+        </div>
+        <div class="card-value">5.4%</div>
+        <div class="card-footer">
+          <div class="card-target"><strong>Target:</strong> >= 92.0%</div>
+          
+          <div class="card-note"><strong>Note:</strong> Late shipments on SO20092 & SO20124</div>
+          
+        </div>
+      </article>
+      
+      <article class="summary-card green">
+        <div class="card-top">
+          <div class="card-label">Days of Supply</div>
+          <div class="pill green">GREEN</div>
+        </div>
+        <div class="card-value">44.3 days</div>
+        <div class="card-footer">
+          <div class="card-target"><strong>Target:</strong> 20.0 to 45.0</div>
+          
+          <div class="card-note"><strong>Note:</strong> Healthy for BR-2208</div>
+          
+        </div>
+      </article>
+      
+      <article class="summary-card red">
+        <div class="card-top">
+          <div class="card-label">Lines Picked per Labor-Hour</div>
+          <div class="pill red">RED</div>
+        </div>
+        <div class="card-value">7.34</div>
+        <div class="card-footer">
+          <div class="card-target"><strong>Target:</strong> >= 14.00</div>
+          
+          <div class="card-note"><strong>Note:</strong> Materially below target</div>
+          
+        </div>
+      </article>
+      
+      <article class="summary-card amber">
+        <div class="card-top">
+          <div class="card-label">Error Rate %</div>
+          <div class="pill amber">AMBER</div>
+        </div>
+        <div class="card-value">1.6%</div>
+        <div class="card-footer">
+          <div class="card-target"><strong>Target:</strong> <= 1.0%</div>
+          
+          <div class="card-note"><strong>Note:</strong> Slightly above tolerance</div>
+          
+        </div>
+      </article>
+      
+    </section>
+
+    <section class="main-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Operational Domains</h2>
+            <div class="panel-subtitle">Structured operational view across inbound, outbound, inventory, warehouse, and workforce performance for rapid executive scanning.</div>
+          </div>
+        </div>
+        <div class="section-grid">
+          
+          <article class="section-card red">
+            <div class="section-top">
+              <h3 class="section-title">Inbound</h3>
+              <div class="pill red">RED Risk</div>
+            </div>
+            <ul class="metric-list">
+              
+              <li class="metric-row">
+                <span class="metric-dot amber"></span>
+                <span class="metric-name">Average Inbound Lead Time</span>
+                <span class="metric-value">6.3 days</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Receipts On-Time %</span>
+                <span class="metric-value">0.0%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Quantity Discrepancy %</span>
+                <span class="metric-value">7.8%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Inbound Volume</span>
+                <span class="metric-value">26,454</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Late Receipt Count</span>
+                <span class="metric-value">123</span>
+              </li>
+              
+              <li class="metric-row metric-row-text">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Top 5 Delaying Suppliers</span>
+                <span class="metric-value">Supplier A (9,900), Supplier C (9,630), Supplier B (9,149)</span>
+              </li>
+              
+            </ul>
+            <div class="section-insight">
+              <div class="narrative-header">
+                <strong>Section Insight</strong>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              Inbound timeliness is critically low at 0.0%, raising supplier receipt risk.
+            </div>
+          </article>
+          
+          <article class="section-card red">
+            <div class="section-top">
+              <h3 class="section-title">Outbound</h3>
+              <div class="pill red">RED Risk</div>
+            </div>
+            <ul class="metric-list">
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Fill Rate %</span>
+                <span class="metric-value">82.1%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">OTIF %</span>
+                <span class="metric-value">5.4%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Backorder Rate %</span>
+                <span class="metric-value">17.9%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Outbound Volume</span>
+                <span class="metric-value">1,747</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Late Shipment Count</span>
+                <span class="metric-value">55</span>
+              </li>
+              
+              <li class="metric-row metric-row-text">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Top 10 SKUs by Backorder</span>
+                <span class="metric-value">MN-5544 (91), BR-2208 (85), CL-7781 (73), ZX-9910 (70), AX-4312 (61)</span>
+              </li>
+              
+            </ul>
+            <div class="section-insight">
+              <div class="narrative-header">
+                <strong>Section Insight</strong>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              Outbound service is severely impacted by low OTIF at 5.4% and high backorder rate of 17.9%.
+            </div>
+          </article>
+          
+          <article class="section-card red">
+            <div class="section-top">
+              <h3 class="section-title">Inventory</h3>
+              <div class="pill red">RED Risk</div>
+            </div>
+            <ul class="metric-list">
+              
+              <li class="metric-row">
+                <span class="metric-dot green"></span>
+                <span class="metric-name">Days of Supply</span>
+                <span class="metric-value">44.3 days</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Stockout Exposure %</span>
+                <span class="metric-value">53.2%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Safety Stock Coverage %</span>
+                <span class="metric-value">60.5%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Aged Inventory % (>180d)</span>
+                <span class="metric-value">51.6%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Average Inventory Age</span>
+                <span class="metric-value">175.5 days</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Inventory Turns</span>
+                <span class="metric-value">79.90</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Aged Inventory Value >180d</span>
+                <span class="metric-value">17,754</span>
+              </li>
+              
+            </ul>
+            <div class="section-insight">
+              <div class="narrative-header">
+                <strong>Section Insight</strong>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              Inventory risk is high with stockout exposure at 53.2% and aged inventory over 51%.
+            </div>
+          </article>
+          
+          <article class="section-card red">
+            <div class="section-top">
+              <h3 class="section-title">Warehouse Productivity</h3>
+              <div class="pill red">RED Risk</div>
+            </div>
+            <ul class="metric-list">
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Lines Picked per Labor-Hour</span>
+                <span class="metric-value">7.34</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Orders Processed per Labor-Hour</span>
+                <span class="metric-value">0.97</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Orders per Day</span>
+                <span class="metric-value">1422.35</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">SLA Adherence %</span>
+                <span class="metric-value">84.4%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot green"></span>
+                <span class="metric-name">Equipment Utilization %</span>
+                <span class="metric-value">79.7%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot green"></span>
+                <span class="metric-name">Touches per Order</span>
+                <span class="metric-value">3.49</span>
+              </li>
+              
+            </ul>
+            <div class="section-insight">
+              <div class="narrative-header">
+                <strong>Section Insight</strong>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              Warehouse throughput is below target with low lines and orders per labor-hour and SLA adherence at 84.4%.
+            </div>
+          </article>
+          
+          <article class="section-card red">
+            <div class="section-top">
+              <h3 class="section-title">Employee Productivity</h3>
+              <div class="pill red">RED Risk</div>
+            </div>
+            <ul class="metric-list">
+              
+              <li class="metric-row">
+                <span class="metric-dot amber"></span>
+                <span class="metric-name">Picks per Person per Hour</span>
+                <span class="metric-value">13.58</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot amber"></span>
+                <span class="metric-name">Error Rate %</span>
+                <span class="metric-value">1.6%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot green"></span>
+                <span class="metric-name">Rework Rate %</span>
+                <span class="metric-value">0.8%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot red"></span>
+                <span class="metric-name">Overtime %</span>
+                <span class="metric-value">17.6%</span>
+              </li>
+              
+              <li class="metric-row">
+                <span class="metric-dot info"></span>
+                <span class="metric-name">Average Tasks per Employee</span>
+                <span class="metric-value">125</span>
+              </li>
+              
+            </ul>
+            <div class="section-insight">
+              <div class="narrative-header">
+                <strong>Section Insight</strong>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              Employee productivity is pressured with overtime at 17.6% and error rate exceeding target.
+            </div>
+          </article>
+          
+        </div>
+      </div>
+
+      <div class="decision-stack">
+        <section class="panel decision-card insights">
+          <div class="panel-header">
+            <div>
+              <div class="narrative-header">
+                <h2 class="panel-title">Key Insights</h2>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              <div class="panel-subtitle">Leadership-level signals that explain current operational pressure.</div>
+            </div>
+          </div>
+          <ul class="decision-list">
+            
+            <li>Inbound receipts on-time are at 0.0%, well below the 95% target.</li>
+            
+            <li>Outbound fill rate is 82.1%, missing the 95% goal.</li>
+            
+            <li>Stockout exposure at 53.2% far exceeds the 2% target.</li>
+            
+            <li>Lines picked per labor-hour are 7.34, below the 14.0 minimum.</li>
+            
+            <li>Overtime is high at 17.6%, more than double the 8% limit.</li>
+            
+          </ul>
+        </section>
+
+        <section class="panel decision-card risks">
+          <div class="panel-header">
+            <div>
+              <div class="narrative-header">
+                <h2 class="panel-title">Operational Risks</h2>
+                <span class="mode-badge">Deterministic</span>
+              </div>
+              <div class="panel-subtitle">Top operational risks that require active monitoring or escalation.</div>
+            </div>
+          </div>
+          <ul class="decision-list">
+            
+            <li>Late inbound receipts are increasing the risk of continued outbound service misses.</li>
+            
+            <li>Inventory coverage gaps may continue to drive stockouts and service degradation.</li>
+            
+            <li>Elevated backorders create immediate customer-service and fulfillment risk.</li>
+            
+          </ul>
+        </section>
+
+        <section class="panel decision-card actions">
+          <div class="panel-header">
+            <div>
+              <div class="narrative-header">
+                <h2 class="panel-title">Recommended Actions</h2>
+                
+                <span class="ai-badge">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"></path>
+                  </svg>
+                  AI
+                </span>
+                
+              </div>
+              <div class="panel-subtitle">Priority actions for supply, inventory, warehouse, and workforce recovery.</div>
+            </div>
+          </div>
+          <ul class="decision-list">
+            
+            <li>Prioritize improving supplier on-time receipts to reduce inbound delays.</li>
+            
+            <li>Address outbound backorders and OTIF performance urgently.</li>
+            
+            <li>Mitigate inventory risks by reducing stockout exposure and aged stock.</li>
+            
+            <li>Enhance warehouse labor efficiency to meet throughput targets.</li>
+            
+            <li>Manage workforce overtime and error rates to improve productivity.</li>
+            
+          </ul>
+       
+        </section>
+      </div>
+    </section>
+
+    <section class="table-panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">KPI Summary Table</h2>
+          <div class="panel-subtitle">Compact reference table for current value, target, and health status with improved scanability for leadership review.</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>KPI</th>
+              <th>Domain</th>
+              <th>Value</th>
+              <th>Unit</th>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Trend / note</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+            <tr>
+              <td>Average Inbound Lead Time</td>
+              <td>Inbound</td>
+              <td class="value">6.3 days</td>
+              <td>days</td>
+              <td class="target"><= 5.00</td>
+              <td class="status-cell"><span class="pill amber">AMBER</span></td>
+              <td>Slightly above tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Receipts On-Time %</td>
+              <td>Inbound</td>
+              <td class="value">0.0%</td>
+              <td>pct</td>
+              <td class="target">>= 95.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Late receipts from Supplier A & Supplier C reduced on-time performance</td>
+            </tr>
+            
+            <tr>
+              <td>Quantity Discrepancy %</td>
+              <td>Inbound</td>
+              <td class="value">7.8%</td>
+              <td>pct</td>
+              <td class="target"><= 2.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Mismatch volume is concentrated with Supplier A & Supplier C</td>
+            </tr>
+            
+            <tr>
+              <td>Inbound Volume</td>
+              <td>Inbound</td>
+              <td class="value">26,454</td>
+              <td>qty</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Inbound volume processed in the selected period</td>
+            </tr>
+            
+            <tr>
+              <td>Late Receipt Count</td>
+              <td>Inbound</td>
+              <td class="value">123</td>
+              <td>count</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Late receipts concentrated across Supplier A & Supplier C</td>
+            </tr>
+            
+            <tr>
+              <td>Top 5 Delaying Suppliers</td>
+              <td>Inbound</td>
+              <td class="value">Supplier A (9,900), Supplier C (9,630), Supplier B (9,149)</td>
+              <td>text</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Ranked by late ordered quantity in the selected period.</td>
+            </tr>
+            
+            <tr>
+              <td>Fill Rate %</td>
+              <td>Outbound</td>
+              <td class="value">82.1%</td>
+              <td>pct</td>
+              <td class="target">>= 95.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>MN-5544 backorders impacted fill rate</td>
+            </tr>
+            
+            <tr>
+              <td>OTIF %</td>
+              <td>Outbound</td>
+              <td class="value">5.4%</td>
+              <td>pct</td>
+              <td class="target">>= 92.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Late shipments on SO20092 & SO20124</td>
+            </tr>
+            
+            <tr>
+              <td>Backorder Rate %</td>
+              <td>Outbound</td>
+              <td class="value">17.9%</td>
+              <td>pct</td>
+              <td class="target"><= 3.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Backorders concentrated in MN-5544 & BR-2208</td>
+            </tr>
+            
+            <tr>
+              <td>Outbound Volume</td>
+              <td>Outbound</td>
+              <td class="value">1,747</td>
+              <td>qty</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Outbound volume shipped in the selected period</td>
+            </tr>
+            
+            <tr>
+              <td>Late Shipment Count</td>
+              <td>Outbound</td>
+              <td class="value">55</td>
+              <td>count</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Late shipments include SO20092 & SO20124</td>
+            </tr>
+            
+            <tr>
+              <td>Top 10 SKUs by Backorder</td>
+              <td>Outbound</td>
+              <td class="value">MN-5544 (91), BR-2208 (85), CL-7781 (73), ZX-9910 (70), AX-4312 (61)</td>
+              <td>text</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Ranked by backordered quantity in the selected period.</td>
+            </tr>
+            
+            <tr>
+              <td>Days of Supply</td>
+              <td>Inventory</td>
+              <td class="value">44.3 days</td>
+              <td>days</td>
+              <td class="target">20.0 to 45.0</td>
+              <td class="status-cell"><span class="pill green">GREEN</span></td>
+              <td>Healthy for BR-2208</td>
+            </tr>
+            
+            <tr>
+              <td>Stockout Exposure %</td>
+              <td>Inventory</td>
+              <td class="value">53.2%</td>
+              <td>pct</td>
+              <td class="target"><= 2.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Above tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Safety Stock Coverage %</td>
+              <td>Inventory</td>
+              <td class="value">60.5%</td>
+              <td>pct</td>
+              <td class="target">>= 95.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Materially below target</td>
+            </tr>
+            
+            <tr>
+              <td>Aged Inventory % (>180d)</td>
+              <td>Inventory</td>
+              <td class="value">51.6%</td>
+              <td>pct</td>
+              <td class="target"><= 15.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Above tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Average Inventory Age</td>
+              <td>Inventory</td>
+              <td class="value">175.5 days</td>
+              <td>days</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Average inventory age across the selected scope</td>
+            </tr>
+            
+            <tr>
+              <td>Inventory Turns</td>
+              <td>Inventory</td>
+              <td class="value">79.90</td>
+              <td>rate</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Proxy uses annualized shipped quantity over average on-hand quantity because finance valuation fields are not present.</td>
+            </tr>
+            
+            <tr>
+              <td>Aged Inventory Value >180d</td>
+              <td>Inventory</td>
+              <td class="value">17,754</td>
+              <td>qty</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Proxy uses aged on-hand quantity because unit_cost is not present in the current data model.</td>
+            </tr>
+            
+            <tr>
+              <td>Lines Picked per Labor-Hour</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">7.34</td>
+              <td>rate</td>
+              <td class="target">>= 14.00</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Materially below target</td>
+            </tr>
+            
+            <tr>
+              <td>Orders Processed per Labor-Hour</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">0.97</td>
+              <td>rate</td>
+              <td class="target">>= 1.20</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Materially below target</td>
+            </tr>
+            
+            <tr>
+              <td>Orders per Day</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">1422.35</td>
+              <td>rate</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Average daily order volume processed</td>
+            </tr>
+            
+            <tr>
+              <td>SLA Adherence %</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">84.4%</td>
+              <td>pct</td>
+              <td class="target">>= 95.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Materially below target</td>
+            </tr>
+            
+            <tr>
+              <td>Equipment Utilization %</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">79.7%</td>
+              <td>pct</td>
+              <td class="target">75.0% to 90.0%</td>
+              <td class="status-cell"><span class="pill green">GREEN</span></td>
+              <td>Within tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Touches per Order</td>
+              <td>Warehouse Productivity</td>
+              <td class="value">3.49</td>
+              <td>rate</td>
+              <td class="target"><= 3.50</td>
+              <td class="status-cell"><span class="pill green">GREEN</span></td>
+              <td>Within tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Picks per Person per Hour</td>
+              <td>Employee Productivity</td>
+              <td class="value">13.58</td>
+              <td>rate</td>
+              <td class="target">>= 14.00</td>
+              <td class="status-cell"><span class="pill amber">AMBER</span></td>
+              <td>Slightly below target</td>
+            </tr>
+            
+            <tr>
+              <td>Error Rate %</td>
+              <td>Employee Productivity</td>
+              <td class="value">1.6%</td>
+              <td>pct</td>
+              <td class="target"><= 1.0%</td>
+              <td class="status-cell"><span class="pill amber">AMBER</span></td>
+              <td>Slightly above tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Rework Rate %</td>
+              <td>Employee Productivity</td>
+              <td class="value">0.8%</td>
+              <td>pct</td>
+              <td class="target"><= 1.5%</td>
+              <td class="status-cell"><span class="pill green">GREEN</span></td>
+              <td>Within tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Overtime %</td>
+              <td>Employee Productivity</td>
+              <td class="value">17.6%</td>
+              <td>pct</td>
+              <td class="target"><= 8.0%</td>
+              <td class="status-cell"><span class="pill red">RED</span></td>
+              <td>Above tolerance</td>
+            </tr>
+            
+            <tr>
+              <td>Average Tasks per Employee</td>
+              <td>Employee Productivity</td>
+              <td class="value">125</td>
+              <td>count</td>
+              <td class="target">n/a</td>
+              <td class="status-cell"><span class="pill info">INFO</span></td>
+              <td>Average task load per employee record</td>
+            </tr>
+            
+          </tbody>
+        </table>
+        <div class="footer-note">
+          <span><strong>Generated by:</strong> KPI Intelligence Agent</span>
+          <span><strong>Reporting window:</strong> 2026-02-01 to 2026-02-28</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

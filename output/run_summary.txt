@@ -1,0 +1,20 @@
+Aftersales Operations KPI Intelligence Summary
+Reporting period: February 2026 (2026-02-01 to 2026-02-28)
+Overall status: RED
+Warehouse scope: All
+SKU family scope: All
+
+Summary cards:
+- Fill Rate %: 82.1% [RED] target=>= 95.0%
+- OTIF %: 5.4% [RED] target=>= 92.0%
+- Days of Supply: 44.3 days [GREEN] target=20.0 to 45.0
+- Lines Picked per Labor-Hour: 7.34 [RED] target=>= 14.00
+- Error Rate %: 1.6% [AMBER] target=<= 1.0%
+
+Top risks:
+- Late inbound receipts are increasing the risk of continued outbound service misses.
+- Inventory coverage gaps may continue to drive stockouts and service degradation.
+- Elevated backorders create immediate customer-service and fulfillment risk.
+
+Validation warnings:
+- outbound_parts: 188 potential outliers detected in 'fill_rate' using IQR bounds.

@@ -1,0 +1,51 @@
+{
+  "header": {
+    "period": "February 2026",
+    "warehouses": [
+      "All"
+    ],
+    "status": "red"
+  },
+  "summary_cards": [
+    {
+      "name": "Fill Rate %",
+      "current": "82.1%",
+      "target": 0.95,
+      "delta": -0.1287,
+      "status": "red",
+      "comment": "MN-5544 backorders impacted fill rate"
+    },
+    {
+      "name": "OTIF %",
+      "current": "5.4%",
+      "target": 0.92,
+      "delta": -0.8662,
+      "status": "red",
+      "comment": "Late shipments on SO20092 & SO20124"
+    },
+    {
+      "name": "Days of Supply",
+      "current": "44.3 days",
+      "target": 30.0,
+      "delta": 14.2581,
+      "status": "green",
+      "comment": "Healthy for BR-2208"
+    },
+    {
+      "name": "Lines Picked per Labor-Hour",
+      "current": "7.34",
+      "target": 14.0,
+      "delta": -6.6616,
+      "status": "red",
+      "comment": "Materially below target"
+    },
+    {
+      "name": "Error Rate %",
+      "current": "1.6%",
+      "target": 0.01,
+      "delta": 0.006,
+      "status": "amber",
+      "comment": "Slightly above tolerance"
+    }
+  ]
+}
