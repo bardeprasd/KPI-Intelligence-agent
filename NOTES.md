@@ -40,15 +40,6 @@
 4. Excel output is formatted for readability, not pixel-perfect BI publishing.
 5. The HTML one-pager is intentionally simple and self-contained.
 
-## Future Enhancements
-1. Add historical trend comparison (prior month, rolling 3 months, YoY)
-2. Persist curated fact and dimension tables to parquet or a SQL warehouse
-3. Expand anomaly detection beyond basic outlier warnings into richer degradation monitoring
-4. Add deeper drill-through outputs by warehouse, supplier, SKU family, and shift
-5. Add configurable alert rules and notification hooks
-6. Add dbt-style tests or pytest-based unit tests
-7. Add a controlled LLM summarization layer that reads only computed KPI JSON and never raw source data
-8. Add Power BI / Tableau export mappings or API publishing endpoints
 
 ## Demo Guidance
 For User, the best end-to-end command is:

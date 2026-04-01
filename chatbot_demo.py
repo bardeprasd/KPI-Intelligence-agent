@@ -27,7 +27,7 @@ DEMO_QUESTIONS = [
 ]
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +90,12 @@ def main() -> None:
     sku_families = [s.strip() for s in args.sku_families.split(",") if s.strip()] if args.sku_families else None
     use_openai = not args.deterministic_chat
     use_llm_summary = not args.deterministic_summary
+    if args.deterministic_chat and not args.use_llm_summary:
+        use_llm_summary = False
+    chatbot_mode = f"LLM BASED | Model: {args.model}" if use_openai else "DETERMINISTIC"
+    summary_mode = f"LLM BASED | Model: {args.model}" if use_llm_summary else "DETERMINISTIC"
+    print(f"Chatbot mode: {chatbot_mode}")
+    print(f"Summary mode: {summary_mode}")
     bot = KPIChatbot.from_project(
         start=args.start,
         end=args.end,

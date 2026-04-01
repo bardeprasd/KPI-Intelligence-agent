@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from .config import DRILLDOWN_CONFIG, DRILLDOWN_DIMENSION_LABELS, KPIThreshold, THRESHOLDS
+from .config import DRILLDOWN_CONFIG, DRILLDOWN_DIMENSION_LABELS, KPIThreshold, RAW_DETAIL_COLUMNS, THRESHOLDS
 
 
 MetricCalculator = Callable[[pd.DataFrame], float]
@@ -229,6 +229,14 @@ def _serialize_dimension_value(value: object) -> object:
     return value.item() if hasattr(value, "item") else value
 
 
+def _serialize_table_value(value: object) -> object:
+    if pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.date().isoformat()
+    return value.item() if hasattr(value, "item") else value
+
+
 def _serialize_filters(
     *,
     start: pd.Timestamp,
@@ -255,6 +263,35 @@ def _metric_snapshot(spec: MetricSpec, frame: pd.DataFrame, grain: str) -> Dict:
         source_table=spec.source_table,
         grain=grain,
     )
+
+
+def build_raw_detail(
+    df: pd.DataFrame,
+    *,
+    section_name: str,
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    sort_by: Sequence[str],
+    logic_note: str,
+) -> Dict:
+    columns = [column for column in RAW_DETAIL_COLUMNS[section_name] if column in df.columns]
+    scoped = df.copy()
+    available_sort = [column for column in sort_by if column in scoped.columns]
+    if available_sort:
+        scoped = scoped.sort_values(available_sort, ascending=[False] * len(available_sort), na_position="last")
+
+    rows: List[Dict] = []
+    for _, row in scoped[columns].iterrows():
+        rows.append({column: _serialize_table_value(row[column]) for column in columns})
+
+    return {
+        "source_dataset": source_dataset,
+        "applied_filters": applied_filters,
+        "columns": columns,
+        "row_count": len(rows),
+        "logic_note": logic_note,
+        "rows": rows,
+    }
 
 
 def _build_drilldown_unavailable(
@@ -588,6 +625,11 @@ def _build_section_drilldowns(
     return drilldowns
 
 
+def _attach_raw_detail(kpis: List[Dict], raw_detail: Dict) -> None:
+    for kpi in kpis:
+        kpi["raw_detail"] = raw_detail
+
+
 def compute_inbound_kpis(
     inbound: pd.DataFrame,
     inventory: pd.DataFrame,
@@ -599,6 +641,8 @@ def compute_inbound_kpis(
 ) -> Dict:
     df = filter_period(inbound, "received_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
+    df = df.copy()
+    df["receipt_on_time_flag"] = (df["received_date"] <= df["expected_date"]).astype(int)
     metric_specs = _inbound_metric_specs()
     metric_lookup = {spec.name: spec for spec in metric_specs}
 
@@ -655,6 +699,17 @@ def compute_inbound_kpis(
             display_override=top_delaying_suppliers,
         ),
     ]
+    _attach_raw_detail(
+        kpis,
+        build_raw_detail(
+            df,
+            section_name="Inbound",
+            source_dataset="inbound_parts",
+            applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+            sort_by=["received_date", "expected_date"],
+            logic_note="Raw detail contains the filtered inbound receipt records used for the selected KPI.",
+        ),
+    )
 
     drilldowns = _build_section_drilldowns(
         section_name="Inbound",
@@ -687,6 +742,8 @@ def compute_outbound_kpis(
 ) -> Dict:
     df = filter_period(outbound, "shipped_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
+    df = df.copy()
+    df["late_shipment_flag"] = (df["shipped_date"] > df["promise_date"]).astype(int)
     metric_specs = _outbound_metric_specs()
     metric_lookup = {spec.name: spec for spec in metric_specs}
 
@@ -754,6 +811,17 @@ def compute_outbound_kpis(
             display_override=backorder_sku_display,
         ),
     ]
+    _attach_raw_detail(
+        kpis,
+        build_raw_detail(
+            df,
+            section_name="Outbound",
+            source_dataset="outbound_parts",
+            applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+            sort_by=["shipped_date", "promise_date"],
+            logic_note="Raw detail contains the filtered outbound shipment records used for the selected KPI.",
+        ),
+    )
 
     drilldowns = _build_section_drilldowns(
         section_name="Outbound",
@@ -787,6 +855,8 @@ def compute_inventory_kpis(
     df = filter_period(inventory, "snapshot_date", start, end)
     df = filter_warehouses(df, warehouses)
     df = filter_sku_families(df, sku_families)
+    df = df.copy()
+    df["below_safety_stock_flag"] = (df["available_qty"] < df["safety_stock"]).astype(int)
     outbound_df = filter_period(outbound, "shipped_date", start, end)
     outbound_df = filter_sku_families(outbound_df, sku_families, allowed_parts)
     metric_specs = _inventory_metric_specs()
@@ -857,6 +927,17 @@ def compute_inventory_kpis(
             note=aged_value_note,
         ),
     ]
+    _attach_raw_detail(
+        kpis,
+        build_raw_detail(
+            df,
+            section_name="Inventory",
+            source_dataset="inventory_snapshot",
+            applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+            sort_by=["snapshot_date", "warehouse_id"],
+            logic_note="Raw detail contains the filtered inventory snapshot rows used for the selected KPI.",
+        ),
+    )
 
     drilldowns = _build_section_drilldowns(
         section_name="Inventory",
@@ -914,6 +995,17 @@ def compute_warehouse_productivity_kpis(
         build_kpi("Equipment Utilization %", equip_util, metric_lookup["Equipment Utilization %"].formula, "warehouse_productivity", "reporting period", note=equipment_comment),
         build_kpi("Touches per Order", touches, metric_lookup["Touches per Order"].formula, "warehouse_productivity", "reporting period", note=touches_comment),
     ]
+    _attach_raw_detail(
+        kpis,
+        build_raw_detail(
+            df,
+            section_name="Warehouse Productivity",
+            source_dataset="warehouse_productivity",
+            applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=None),
+            sort_by=["date", "warehouse_id"],
+            logic_note="Raw detail contains the filtered warehouse productivity rows used for the selected KPI.",
+        ),
+    )
 
     drilldowns = _build_section_drilldowns(
         section_name="Warehouse Productivity",
@@ -970,6 +1062,17 @@ def compute_employee_productivity_kpis(
         build_kpi("Overtime %", overtime, metric_lookup["Overtime %"].formula, "employee_productivity", "reporting period", note=overtime_comment),
         build_kpi("Average Tasks per Employee", avg_tasks, metric_lookup["Average Tasks per Employee"].formula, "employee_productivity", "reporting period", note=avg_tasks_comment),
     ]
+    _attach_raw_detail(
+        kpis,
+        build_raw_detail(
+            df,
+            section_name="Employee Productivity",
+            source_dataset="employee_productivity",
+            applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=None),
+            sort_by=["date", "employee_id"],
+            logic_note="Raw detail contains the filtered employee productivity rows used for the selected KPI.",
+        ),
+    )
 
     drilldowns = _build_section_drilldowns(
         section_name="Employee Productivity",

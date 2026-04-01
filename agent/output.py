@@ -60,6 +60,14 @@ HTML_DRILLDOWN_TARGETS = {
     "Average Tasks per Employee": "by_employee",
 }
 
+GROUP_RAW_DETAIL_COLUMN_MAP = {
+    "receipt_date_day": "received_date",
+    "ship_date_day": "shipped_date",
+    "snapshot_date_day": "snapshot_date",
+    "operation_date_day": "date",
+    "work_date_day": "date",
+}
+
 
 def _html_slug(text: str) -> str:
     return "".join(ch.lower() if ch.isalnum() else "-" for ch in text).strip("-")
@@ -119,6 +127,35 @@ def _preferred_drilldown(section: Dict, kpi_name: str) -> Optional[Dict]:
     }
 
 
+def _normalize_group_match_value(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _group_matches_raw_row(raw_row: Dict, group_dimensions: Dict[str, object]) -> bool:
+    for group_column, group_value in group_dimensions.items():
+        if group_column == "rank":
+            continue
+        raw_column = GROUP_RAW_DETAIL_COLUMN_MAP.get(group_column, group_column)
+        raw_value = raw_row.get(raw_column)
+        if _normalize_group_match_value(raw_value) != _normalize_group_match_value(group_value):
+            return False
+    return True
+
+
+def _build_group_raw_detail(raw_detail: Optional[Dict], group_dimensions: Dict[str, object]) -> Optional[Dict]:
+    if not raw_detail:
+        return None
+    matching_rows = [row for row in raw_detail.get("rows", []) if _group_matches_raw_row(row, group_dimensions)]
+    return {
+        "columns": raw_detail.get("columns", []),
+        "row_count": len(matching_rows),
+        "logic_note": "Raw records filtered to the selected grouped row.",
+        "rows": matching_rows,
+    }
+
+
 def _build_html_kpi_drilldown(section: Dict, kpi: Dict) -> Optional[Dict]:
     preferred = _preferred_drilldown(section, kpi["name"])
     if not preferred:
@@ -153,11 +190,14 @@ def _build_html_kpi_drilldown(section: Dict, kpi: Dict) -> Optional[Dict]:
                 metric = metric_values[0]
         if not metric:
             continue
+        group_dimensions = {column: row.get(column) for column in table.get("group_by", [])}
         rows.append({
             "dimensions": {column: row.get(column) for column in table.get("group_by", [])},
             "row_count": row.get("row_count"),
             "rank": row.get("rank"),
             "metric": metric,
+            "group_anchor": f"{payload['anchor']}-group-{len(rows) + 1}",
+            "raw_detail": _build_group_raw_detail(kpi.get("raw_detail"), group_dimensions),
         })
     payload["rows"] = rows
     if not rows and payload["available"]:
@@ -906,6 +946,7 @@ HTML_TEMPLATE = """
     }
 
     .drilldown-link:hover { text-decoration: underline; }
+    .drilldown-link::before { content: "↓"; font-size: 12px; line-height: 1; }
 
     .drilldown-jump {
       display: inline-flex;
@@ -921,6 +962,7 @@ HTML_TEMPLATE = """
     }
 
     .drilldown-jump:hover { text-decoration: underline; }
+    .drilldown-jump::before { content: "↓"; font-size: 11px; line-height: 1; }
 
     .card-top {
       display: flex;
@@ -1366,9 +1408,19 @@ HTML_TEMPLATE = """
       font-weight: 800;
       color: var(--text-strong);
       list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .drilldown-card summary::-webkit-details-marker { display: none; }
+    .drilldown-card summary::before {
+      content: "▾";
+      font-size: 14px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .drilldown-card:not([open]) summary::before { content: "▸"; }
 
     .drilldown-meta {
       margin: 10px 0 14px;
@@ -1390,6 +1442,49 @@ HTML_TEMPLATE = """
       color: var(--muted);
       padding-top: 10px;
     }
+
+    .raw-detail-title {
+      margin: 16px 0 8px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .group-detail-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .group-detail-card {
+      border: 1px solid rgba(19, 35, 56, 0.08);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      overflow: hidden;
+    }
+
+    .group-detail-card summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-strong);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .group-detail-card summary::-webkit-details-marker { display: none; }
+    .group-detail-card summary::before {
+      content: "▾";
+      font-size: 13px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .group-detail-card:not([open]) summary::before { content: "▸"; }
 
     .footer-note {
       margin-top: 12px;
@@ -1705,6 +1800,45 @@ HTML_TEMPLATE = """
                   {% endfor %}
                 </tbody>
               </table>
+            </div>
+            <div class="raw-detail-title">Group-Specific Raw Records</div>
+            <div class="group-detail-list">
+              {% for row in drilldown.rows %}
+              <details class="group-detail-card" id="{{ row.group_anchor }}">
+                <summary>
+                  {% if row.rank is not none %}Rank {{ row.rank }} | {% endif %}
+                  {% for column in drilldown.group_by %}
+                  {{ drilldown.dimension_labels[column] }}: {{ row.dimensions[column] }}{% if not loop.last %} | {% endif %}
+                  {% endfor %}
+                  | {{ row.metric.display_value }}
+                </summary>
+                {% if row.raw_detail and row.raw_detail.rows %}
+                <div class="drilldown-meta" style="padding: 0 14px 12px;">{{ row.raw_detail.logic_note }} Row count: {{ row.raw_detail.row_count }}</div>
+                <div class="table-wrap" style="padding:0 14px 14px;">
+                  <table class="drilldown-table">
+                    <thead>
+                      <tr>
+                        {% for column in row.raw_detail.columns %}
+                        <th>{{ column }}</th>
+                        {% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for raw_row in row.raw_detail.rows %}
+                      <tr>
+                        {% for column in row.raw_detail.columns %}
+                        <td>{{ raw_row[column] }}</td>
+                        {% endfor %}
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}
+                <div class="drilldown-empty" style="padding: 0 14px 14px;">No raw records matched this grouped row.</div>
+                {% endif %}
+              </details>
+              {% endfor %}
             </div>
             {% endif %}
           </details>

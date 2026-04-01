@@ -31,6 +31,37 @@ Keep answers concise, business-friendly, and helpful.
 Use conversation memory when the user asks follow-up questions.
 If a question asks for KPI values or comparisons, answer using the grounded payload rather than generic advice.
 """
+
+
+def _compact_kpi_for_llm(kpi: Dict) -> Dict:
+    return {
+        "name": kpi.get("name"),
+        "display_value": kpi.get("display_value"),
+        "value": kpi.get("value"),
+        "unit": kpi.get("unit"),
+        "status": kpi.get("status"),
+        "target_display": kpi.get("target_display"),
+        "note": kpi.get("note"),
+    }
+
+
+def _compact_section_for_llm(section: Dict) -> Dict:
+    return {
+        "name": section.get("name"),
+        "risk_level": section.get("risk_level"),
+        "insight": section.get("insight"),
+        "kpis": [_compact_kpi_for_llm(kpi) for kpi in section.get("kpis", [])],
+    }
+
+
+def _compact_summary_card_for_llm(card: Dict) -> Dict:
+    return {
+        "label": card.get("label"),
+        "display_value": card.get("display_value"),
+        "status": card.get("status"),
+        "target_display": card.get("target_display"),
+        "note": card.get("note"),
+    }
 # Alias maps translate natural user phrasing into canonical KPI names.
 KPI_ALIASES = {
     "fill rate": "Fill Rate %",
@@ -346,11 +377,16 @@ class KPIChatbot:
         # to the same payload shown elsewhere in the application.
         grounded_payload = {
             "reporting_period": self.payload.get("reporting_period"),
-            "header": self.payload.get("header"),
-            "summary_cards": self.payload.get("summary_cards", []),
-            "sections": self.payload.get("sections", []),
-            "insights": self.payload.get("insights", []),
-            "recommendations": self.payload.get("recommendations", []),
+            "header": {
+                "title": self.payload.get("header", {}).get("title"),
+                "overall_status": self.payload.get("header", {}).get("overall_status"),
+                "warehouse_scope": self.payload.get("header", {}).get("warehouse_scope"),
+                "sku_family_scope": self.payload.get("header", {}).get("sku_family_scope"),
+            },
+            "summary_cards": [_compact_summary_card_for_llm(card) for card in self.payload.get("summary_cards", [])],
+            "sections": [_compact_section_for_llm(section) for section in self.payload.get("sections", [])],
+            "insights": self.payload.get("insights", [])[:5],
+            "recommendations": self.payload.get("recommendations", [])[:5],
             "available_warehouses": self.available_warehouses,
             "warehouse_scope": self.warehouse_scope,
         }
@@ -358,7 +394,7 @@ class KPIChatbot:
         # context without overloading the prompt.
         memory = [
             {"user": q, "assistant": a}
-            for q, a in self.memory.turns[-6:]
+            for q, a in self.memory.turns[-3:]
         ]
         try:
             response = client.responses.create(
@@ -401,7 +437,8 @@ class KPIChatbot:
         if use_openai:
             try:
                 return self.answer_with_openai(question, model=model)
-            except RuntimeError:
+            except RuntimeError as exc:
+                print(f"LLM chatbot unavailable. Falling back to deterministic mode. Reason: {exc}")
                 return self.answer(question)
         return self.answer(question)
 
