@@ -171,3 +171,103 @@ LLM_SUMMARY_CONFIG = {
     "model": "gpt-4.1-mini",
     "purpose": "Optional narrative refinement layer. KPI calculations remain deterministic.",
 }
+
+
+# Drill-down dimensions made available per section. Sections can request
+# dimensions that are not present in a given dataset; downstream logic will skip
+# unavailable dimensions gracefully while preserving the configured order.
+DRILLDOWN_CONFIG: Dict[str, Dict[str, object]] = {
+    "Inbound": {
+        "source_dataset": "inbound_parts",
+        "dimension_order": [
+            "by_warehouse",
+            "by_supplier",
+            "by_sku_family",
+            "by_part_number",
+            "by_date",
+        ],
+        "dimensions": {
+            "by_warehouse": ["warehouse_id"],
+            "by_supplier": ["supplier_name"],
+            "by_sku_family": ["sku_family"],
+            "by_part_number": ["part_number"],
+            "by_date": ["receipt_date"],
+        },
+    },
+    "Outbound": {
+        "source_dataset": "outbound_parts",
+        "dimension_order": [
+            "by_warehouse",
+            "by_customer",
+            "by_sku_family",
+            "by_part_number",
+            "by_date",
+        ],
+        "dimensions": {
+            "by_warehouse": ["warehouse_id"],
+            "by_customer": ["customer_name"],
+            "by_sku_family": ["sku_family"],
+            "by_part_number": ["part_number"],
+            "by_date": ["ship_date"],
+        },
+    },
+    "Inventory": {
+        "source_dataset": "inventory_snapshot",
+        "dimension_order": [
+            "by_warehouse",
+            "by_sku_family",
+            "by_part_number",
+            "by_date",
+        ],
+        "dimensions": {
+            "by_warehouse": ["warehouse_id"],
+            "by_sku_family": ["sku_family"],
+            "by_part_number": ["part_number"],
+            "by_date": ["snapshot_date"],
+        },
+    },
+    "Warehouse Productivity": {
+        "source_dataset": "warehouse_productivity",
+        "dimension_order": [
+            "by_warehouse",
+            "by_date",
+            "by_shift",
+        ],
+        "dimensions": {
+            "by_warehouse": ["warehouse_id"],
+            "by_date": ["operation_date"],
+            "by_shift": ["shift"],
+        },
+    },
+    "Employee Productivity": {
+        "source_dataset": "employee_productivity",
+        "dimension_order": [
+            "by_warehouse",
+            "by_employee",
+            "by_date",
+            "by_shift",
+        ],
+        "dimensions": {
+            "by_warehouse": ["warehouse_id"],
+            "by_employee": ["employee_id"],
+            "by_date": ["work_date"],
+            "by_shift": ["shift"],
+        },
+    },
+}
+
+
+DRILLDOWN_DIMENSION_LABELS: Dict[str, str] = {
+    "warehouse_id": "Warehouse",
+    "supplier_name": "Supplier",
+    "customer_name": "Customer",
+    "sku_family": "SKU Family",
+    "part_number": "Part Number",
+    "employee_id": "Employee",
+    "receipt_date": "Receipt Date",
+    "ship_date": "Shipped Date",
+    "snapshot_date": "Snapshot Date",
+    "operation_date": "Date",
+    "work_date": "Date",
+    "shift": "Shift",
+}

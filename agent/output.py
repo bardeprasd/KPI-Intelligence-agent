@@ -29,6 +29,192 @@ STATUS_FILL = {
 }
 
 
+HTML_DRILLDOWN_TARGETS = {
+    "Average Inbound Lead Time": "by_supplier",
+    "Receipts On-Time %": "by_supplier",
+    "Quantity Discrepancy %": "by_part_number",
+    "Inbound Volume": "by_date",
+    "Late Receipt Count": "by_supplier",
+    "Top 5 Delaying Suppliers": "by_late_supplier_rank",
+    "Fill Rate %": "by_part_number",
+    "OTIF %": "by_customer",
+    "Backorder Rate %": "by_part_number",
+    "Outbound Volume": "by_date",
+    "Late Shipment Count": "by_customer",
+    "Top 10 SKUs by Backorder": "by_backorder_sku_rank",
+    "Days of Supply": "by_sku_family",
+    "Stockout Exposure %": "by_sku_family",
+    "Safety Stock Coverage %": "by_warehouse",
+    "Aged Inventory % (>180d)": "by_part_number",
+    "Average Inventory Age": "by_part_number",
+    "Lines Picked per Labor-Hour": "by_warehouse",
+    "Orders Processed per Labor-Hour": "by_warehouse",
+    "Orders per Day": "by_date",
+    "SLA Adherence %": "by_warehouse",
+    "Equipment Utilization %": "by_warehouse",
+    "Touches per Order": "by_warehouse",
+    "Picks per Person per Hour": "by_employee",
+    "Error Rate %": "by_employee",
+    "Rework Rate %": "by_employee",
+    "Overtime %": "by_employee",
+    "Average Tasks per Employee": "by_employee",
+}
+
+
+def _html_slug(text: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "-" for ch in text).strip("-")
+
+
+def _drilldown_anchor(section_name: str, drilldown_id: str, grain: Optional[str] = None) -> str:
+    anchor = f"drilldown-{_html_slug(section_name)}-{_html_slug(drilldown_id)}"
+    if grain:
+        anchor = f"{anchor}-{_html_slug(grain)}"
+    return anchor
+
+
+def _kpi_drilldown_anchor(section_name: str, kpi_name: str) -> str:
+    return f"kpi-drilldown-{_html_slug(section_name)}-{_html_slug(kpi_name)}"
+
+
+def _primary_drilldown_anchor(section: Dict, kpi_name: Optional[str] = None) -> Optional[str]:
+    drilldowns = section.get("drilldowns", {})
+    preferred = HTML_DRILLDOWN_TARGETS.get(kpi_name or "")
+    candidates = [preferred] if preferred else []
+    candidates.extend(drilldowns.keys())
+    seen = set()
+    for drilldown_id in candidates:
+        if not drilldown_id or drilldown_id in seen:
+            continue
+        seen.add(drilldown_id)
+        drilldown = drilldowns.get(drilldown_id)
+        if not drilldown:
+            continue
+        if drilldown.get("grain_tables"):
+            return _drilldown_anchor(section["name"], drilldown_id, "day")
+        return _drilldown_anchor(section["name"], drilldown_id)
+    return None
+
+
+def _preferred_drilldown(section: Dict, kpi_name: str) -> Optional[Dict]:
+    drilldown_id = HTML_DRILLDOWN_TARGETS.get(kpi_name)
+    if not drilldown_id:
+        return None
+    drilldown = section.get("drilldowns", {}).get(drilldown_id)
+    if not drilldown:
+        return None
+    if drilldown.get("grain_tables"):
+        grain_table = drilldown["grain_tables"].get("day")
+        if grain_table:
+            return {
+                "drilldown_id": drilldown_id,
+                "label": f"{drilldown.get('label', drilldown_id)} (Day)",
+                "table": grain_table,
+                "base_drilldown": drilldown,
+            }
+    return {
+        "drilldown_id": drilldown_id,
+        "label": drilldown.get("label", drilldown_id),
+        "table": drilldown,
+        "base_drilldown": drilldown,
+    }
+
+
+def _build_html_kpi_drilldown(section: Dict, kpi: Dict) -> Optional[Dict]:
+    preferred = _preferred_drilldown(section, kpi["name"])
+    if not preferred:
+        return None
+
+    drilldown = preferred["base_drilldown"]
+    table = preferred["table"]
+    payload = {
+        "anchor": _kpi_drilldown_anchor(section["name"], kpi["name"]),
+        "section_name": section["name"],
+        "kpi_name": kpi["name"],
+        "label": preferred["label"],
+        "source_dataset": drilldown.get("source_dataset", ""),
+        "applied_filters": drilldown.get("applied_filters", {}),
+        "logic_note": drilldown.get("logic_note", ""),
+        "group_by": [column for column in table.get("group_by", []) if column != "rank"],
+        "dimension_labels": table.get("dimension_labels", {}),
+        "available": bool(drilldown.get("available")),
+        "rows": [],
+        "unavailable_reason": drilldown.get("unavailable_reason"),
+    }
+
+    if not drilldown.get("available"):
+        return payload
+
+    rows: List[Dict] = []
+    for row in table.get("rows", []):
+        metric = row.get("metrics", {}).get(kpi["name"])
+        if not metric:
+            metric_values = list(row.get("metrics", {}).values())
+            if len(metric_values) == 1:
+                metric = metric_values[0]
+        if not metric:
+            continue
+        rows.append({
+            "dimensions": {column: row.get(column) for column in table.get("group_by", [])},
+            "row_count": row.get("row_count"),
+            "rank": row.get("rank"),
+            "metric": metric,
+        })
+    payload["rows"] = rows
+    if not rows and payload["available"]:
+        payload["unavailable_reason"] = f"No drill-down rows were available for {kpi['name']}."
+    return payload
+
+
+def _flatten_drilldown_rows(section: Dict) -> List[Dict]:
+    rows: List[Dict] = []
+    for drilldown_id, drilldown in section.get("drilldowns", {}).items():
+        if not drilldown.get("available"):
+            rows.append({
+                "section": section["name"],
+                "drilldown": drilldown_id,
+                "grain": None,
+                "available": False,
+                "reason": drilldown.get("unavailable_reason"),
+                "dimension_values": "",
+                "metric": "",
+                "display_value": "",
+                "status": "",
+                "formula": "",
+                "source_dataset": drilldown.get("source_dataset", ""),
+            })
+            continue
+
+        grain_tables = drilldown.get("grain_tables")
+        if grain_tables:
+            for grain, grain_table in grain_tables.items():
+                rows.extend(_flatten_single_drilldown(section["name"], drilldown_id, grain_table, grain))
+        else:
+            rows.extend(_flatten_single_drilldown(section["name"], drilldown_id, drilldown, None))
+    return rows
+
+
+def _flatten_single_drilldown(section_name: str, drilldown_id: str, drilldown: Dict, grain: Optional[str]) -> List[Dict]:
+    flattened: List[Dict] = []
+    group_by = drilldown.get("group_by", [])
+    for row in drilldown.get("rows", []):
+        dimensions = ", ".join(f"{column}={row.get(column)}" for column in group_by)
+        for metric_name, metric in row.get("metrics", {}).items():
+            flattened.append({
+                "section": section_name,
+                "drilldown": drilldown_id,
+                "grain": grain,
+                "available": True,
+                "reason": None,
+                "dimension_values": dimensions,
+                "metric": metric_name,
+                "display_value": metric.get("display_value", ""),
+                "status": metric.get("status", ""),
+                "formula": metric.get("formula", ""),
+                "source_dataset": drilldown.get("source_dataset", ""),
+            })
+    return flattened
+
+
 def overall_status(summary_cards: List[Dict]) -> str:
     # ================================
     # Function: overall_status
@@ -55,10 +241,10 @@ def build_summary_cards(sections: List[Dict]) -> List[Dict]:
     # Output:
     #   - List[Dict] containing summary-card payloads in configured order
     # ================================
-    lookup = {kpi["name"]: kpi for section in sections for kpi in section["kpis"]}
+    lookup = {kpi["name"]: (section, kpi) for section in sections for kpi in section["kpis"]}
     cards = []
     for name in SUMMARY_CARD_ORDER:
-        k = lookup[name]
+        section, k = lookup[name]
         cards.append({
             "label": k["name"],
             "value": k["value"],
@@ -68,6 +254,7 @@ def build_summary_cards(sections: List[Dict]) -> List[Dict]:
             "target": k["target"],
             "target_display": k["target_display"],
             "note": k.get("note", ""),
+            "drilldown_anchor": _kpi_drilldown_anchor(section["name"], k["name"]),
         })
     return cards
 
@@ -101,6 +288,28 @@ def build_payload(
     #   - Stores traceability, assumptions, and filter scope alongside KPI data
     # ================================
     summary_cards = build_summary_cards(sections)
+    section_lookup = {section["name"]: section for section in sections}
+    kpi_anchor_lookup: Dict[tuple[str, str], Optional[str]] = {}
+    for section in sections:
+        section["drilldown_anchor"] = _primary_drilldown_anchor(section)
+        section["html_kpi_drilldowns"] = []
+        for drilldown_id, drilldown in section.get("drilldowns", {}).items():
+            drilldown["html_anchor"] = _drilldown_anchor(section["name"], drilldown_id)
+            if drilldown.get("grain_tables"):
+                for grain, grain_table in drilldown["grain_tables"].items():
+                    grain_table["html_anchor"] = _drilldown_anchor(section["name"], drilldown_id, grain)
+        for kpi in section["kpis"]:
+            kpi["drilldown_anchor"] = None
+            html_drilldown = _build_html_kpi_drilldown(section, kpi)
+            if html_drilldown:
+                kpi["drilldown_anchor"] = html_drilldown["anchor"]
+                section["html_kpi_drilldowns"].append(html_drilldown)
+            kpi_anchor_lookup[(section["name"], kpi["name"])] = kpi["drilldown_anchor"]
+    for card in summary_cards:
+        section = section_lookup.get(next(row["domain"] for row in kpi_table if row["kpi"] == card["label"]))
+        card["drilldown_anchor"] = kpi_anchor_lookup.get((section["name"], card["label"])) if section else None
+    for row in kpi_table:
+        row["drilldown_anchor"] = kpi_anchor_lookup.get((row["domain"], row["kpi"]))
     payload = {
         "header": {
             "title": "Aftersales Operations KPI Intelligence Summary",
@@ -136,6 +345,7 @@ def build_payload(
             "calculation_version": CALCULATION_VERSION,
             "narrative_generation": "llm_refined" if llm_used else "deterministic",
             "risk_generation": "deterministic",
+            "drilldown_enabled": True,
             "generated_files": [],
         },
         "audit": {
@@ -144,6 +354,7 @@ def build_payload(
             "formula_traceability": True,
             "period_logic": "Latest full common month across operational event dates when start/end are not explicitly supplied.",
             "status_logic": "KPI statuses are assigned from config-driven threshold rules (green/amber/red/info).",
+            "drilldown_traceability": "Each drill-down table includes source dataset, applied filters, and deterministic formula notes.",
         },
     }
     return payload
@@ -324,6 +535,27 @@ def write_excel(payload: Dict, output_dir: Path) -> Path:
                 kpi["target_display"], kpi["status"].upper(), kpi["formula"], kpi["source_table"]
             ])
             _apply_status_fill(detail.cell(detail.max_row, 7), kpi["status"])
+
+    drilldown_ws = wb.create_sheet("Drilldowns")
+    drilldown_ws.append(["Section", "Drilldown", "Time Grain", "Dimension Values", "Metric", "Value", "Status", "Formula", "Source Dataset", "Availability / Reason"])
+    for cell in drilldown_ws[1]:
+        cell.font = Font(bold=True)
+    for section in payload["sections"]:
+        for row in _flatten_drilldown_rows(section):
+            drilldown_ws.append([
+                row["section"],
+                row["drilldown"],
+                row["grain"] or "",
+                row["dimension_values"],
+                row["metric"],
+                row["display_value"],
+                row["status"].upper() if row["status"] else "",
+                row["formula"],
+                row["source_dataset"],
+                "AVAILABLE" if row["available"] else (row["reason"] or "UNAVAILABLE"),
+            ])
+            if row["status"]:
+                _apply_status_fill(drilldown_ws.cell(drilldown_ws.max_row, 7), row["status"])
 
     insights_ws = wb.create_sheet("Insights_Actions")
     insights_ws.append(["Type", "Text"])
@@ -659,6 +891,36 @@ HTML_TEMPLATE = """
     .summary-card.green::before { background: linear-gradient(90deg, var(--green) 0%, rgba(38, 119, 90, 0.35) 100%); }
     .summary-card.info::before { background: linear-gradient(90deg, var(--info) 0%, rgba(55, 100, 141, 0.35) 100%); }
     .summary-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+    .drilldown-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .drilldown-link:hover { text-decoration: underline; }
+
+    .drilldown-jump {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .drilldown-jump:hover { text-decoration: underline; }
 
     .card-top {
       display: flex;
@@ -1085,6 +1347,50 @@ HTML_TEMPLATE = """
     td.value { font-weight: 800; color: var(--text-strong); }
     td.value, td.target, td.status-cell { white-space: nowrap; }
 
+    .drilldown-stack {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .drilldown-card {
+      margin: 0 var(--space-4) var(--space-4);
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(19, 35, 56, 0.08);
+      background: rgba(250, 252, 255, 0.88);
+      scroll-margin-top: 18px;
+    }
+
+    .drilldown-card summary {
+      cursor: pointer;
+      font-weight: 800;
+      color: var(--text-strong);
+      list-style: none;
+    }
+
+    .drilldown-card summary::-webkit-details-marker { display: none; }
+
+    .drilldown-meta {
+      margin: 10px 0 14px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .drilldown-table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+    }
+
+    .drilldown-empty {
+      font-size: 12px;
+      color: var(--muted);
+      padding-top: 10px;
+    }
+
     .footer-note {
       margin-top: 12px;
       display: flex;
@@ -1176,6 +1482,9 @@ HTML_TEMPLATE = """
           {% if card.note %}
           <div class="card-note"><strong>Note:</strong> {{ card.note }}</div>
           {% endif %}
+          {% if card.drilldown_anchor %}
+          <a class="drilldown-link" href="#{{ card.drilldown_anchor }}">View Drill-Down</a>
+          {% endif %}
         </div>
       </article>
       {% endfor %}
@@ -1200,7 +1509,12 @@ HTML_TEMPLATE = """
               {% for kpi in section.kpis %}
               <li class="metric-row{% if kpi.unit == 'text' %} metric-row-text{% endif %}">
                 <span class="metric-dot {{ kpi.status }}"></span>
-                <span class="metric-name">{{ kpi.name }}</span>
+                <span class="metric-name">
+                  {{ kpi.name }}
+                  {% if kpi.drilldown_anchor %}
+                  <br /><a class="drilldown-jump" href="#{{ kpi.drilldown_anchor }}">Open Drill-Down</a>
+                  {% endif %}
+                </span>
                 <span class="metric-value">{{ kpi.display_value }}</span>
               </li>
               {% endfor %}
@@ -1248,23 +1562,6 @@ HTML_TEMPLATE = """
           </div>
           <ul class="decision-list">
             {% for item in payload.insights %}
-            <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
-        </section>
-
-        <section class="panel decision-card risks">
-          <div class="panel-header">
-            <div>
-              <div class="narrative-header">
-                <h2 class="panel-title">Operational Risks</h2>
-                <span class="mode-badge">Deterministic</span>
-              </div>
-              <div class="panel-subtitle">Top operational risks that require active monitoring or escalation.</div>
-            </div>
-          </div>
-          <ul class="decision-list">
-            {% for item in payload.risks %}
             <li>{{ item }}</li>
             {% endfor %}
           </ul>
@@ -1336,7 +1633,12 @@ HTML_TEMPLATE = """
                 {% endif %}
               </td>
               <td class="status-cell"><span class="pill {{ row.status }}">{{ row.status.upper() }}</span></td>
-              <td>{{ row.trend_note or 'Current-period view' }}</td>
+              <td>
+                {{ row.trend_note or 'Current-period view' }}
+                {% if row.drilldown_anchor %}
+                <br /><a class="drilldown-jump" href="#{{ row.drilldown_anchor }}">Open Drill-Down</a>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1347,7 +1649,83 @@ HTML_TEMPLATE = """
         </div>
       </div>
     </section>
+
+    <section class="table-panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Drill-Down Detail</h2>
+          <div class="panel-subtitle">Each KPI opens its own deterministic detail table, filtered to the specific metric that was clicked.</div>
+        </div>
+      </div>
+      <div class="drilldown-stack">
+        {% for section in payload.sections %}
+          {% for drilldown in section.html_kpi_drilldowns %}
+          <details class="drilldown-card" id="{{ drilldown.anchor }}">
+            <summary>{{ drilldown.section_name }} | {{ drilldown.kpi_name }}</summary>
+            <div class="drilldown-meta">
+              Detail view: {{ drilldown.label }} |
+              Source: {{ drilldown.source_dataset }} |
+              Warehouse filter: {{ drilldown.applied_filters.warehouse_filter or 'All' }} |
+              SKU family filter: {{ drilldown.applied_filters.sku_family_filter or 'All' }}
+            </div>
+            {% if drilldown.logic_note %}
+            <div class="drilldown-meta">{{ drilldown.logic_note }}</div>
+            {% endif %}
+            {% if not drilldown.available or not drilldown.rows %}
+            <div class="drilldown-empty">{{ drilldown.unavailable_reason }}</div>
+            {% else %}
+            <div class="table-wrap" style="padding:0;">
+              <table class="drilldown-table">
+                <thead>
+                  <tr>
+                    {% if drilldown.rows[0].rank is not none %}
+                    <th>Rank</th>
+                    {% endif %}
+                    {% for column in drilldown.group_by %}
+                    <th>{{ drilldown.dimension_labels[column] }}</th>
+                    {% endfor %}
+                    <th>{{ drilldown.kpi_name }}</th>
+                    <th>Status</th>
+                    <th>Formula</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in drilldown.rows %}
+                  <tr>
+                    {% if row.rank is not none %}
+                    <td>{{ row.rank }}</td>
+                    {% endif %}
+                    {% for column in drilldown.group_by %}
+                    <td>{{ row.dimensions[column] }}</td>
+                    {% endfor %}
+                    <td>{{ row.metric.display_value }}</td>
+                    <td>{% if row.metric.status and row.metric.status != 'info' %}{{ row.metric.status.upper() }}{% else %}n/a{% endif %}</td>
+                    <td>{{ row.metric.formula }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% endif %}
+          </details>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </section>
   </div>
+  <script>
+    (function () {
+      function openTargetFromHash() {
+        if (!window.location.hash) return;
+        var target = document.getElementById(window.location.hash.slice(1));
+        if (!target) return;
+        var details = target.closest('details');
+        if (details) details.open = true;
+      }
+      window.addEventListener('hashchange', openTargetFromHash);
+      openTargetFromHash();
+    }());
+  </script>
 </body>
 </html>
 """

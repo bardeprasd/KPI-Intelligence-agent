@@ -8,70 +8,44 @@ status against configured thresholds, and packages results into a common schema.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from .config import THRESHOLDS, KPIThreshold
+from .config import DRILLDOWN_CONFIG, DRILLDOWN_DIMENSION_LABELS, KPIThreshold, THRESHOLDS
+
+
+MetricCalculator = Callable[[pd.DataFrame], float]
+
+
+@dataclass(frozen=True)
+class MetricSpec:
+    name: str
+    formula: str
+    source_table: str
+    compute: MetricCalculator
 
 
 def safe_divide(numerator: float, denominator: float) -> float:
-    # ================================
-    # Function: safe_divide
-    # Purpose: Prevents divide-by-zero errors in KPI calculations.
-    # Inputs:
-    #   - numerator (float)
-    #   - denominator (float)
-    # Output:
-    #   - float result, or 0.0 when the denominator is zero
-    # ================================
     return float(numerator / denominator) if denominator not in (0, 0.0) else 0.0
 
 
 def filter_period(df: pd.DataFrame, date_col: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
-    # ================================
-    # Function: filter_period
-    # Purpose: Restricts a dataset to the selected reporting date range.
-    # Inputs:
-    #   - df (pd.DataFrame): source dataset
-    #   - date_col (str): timestamp column used for filtering
-    #   - start (pd.Timestamp): inclusive range start
-    #   - end (pd.Timestamp): inclusive range end
-    # Output:
-    #   - pd.DataFrame limited to the requested period
-    # ================================
     return df[(df[date_col] >= start) & (df[date_col] <= end)].copy()
 
 
 def filter_warehouses(df: pd.DataFrame, warehouses: Optional[Sequence[str]]) -> pd.DataFrame:
-    # ================================
-    # Function: filter_warehouses
-    # Purpose: Applies optional warehouse scoping when the dataset supports it.
-    # Inputs:
-    #   - df (pd.DataFrame): source dataset
-    #   - warehouses (Optional[Sequence[str]]): requested warehouse IDs
-    # Output:
-    #   - pd.DataFrame filtered to the requested warehouses
-    # ================================
     if not warehouses or "warehouse_id" not in df.columns:
         return df
     return df[df["warehouse_id"].isin(warehouses)].copy()
 
 
-def filter_sku_families(df: pd.DataFrame, sku_families: Optional[Sequence[str]], allowed_parts: Optional[Sequence[str]] = None) -> pd.DataFrame:
-    # ================================
-    # Function: filter_sku_families
-    # Purpose: Applies SKU-family scoping to datasets with or without family columns.
-    # Inputs:
-    #   - df (pd.DataFrame): source dataset
-    #   - sku_families (Optional[Sequence[str]]): requested SKU families
-    #   - allowed_parts (Optional[Sequence[str]]): derived part-number fallback
-    # Output:
-    #   - pd.DataFrame filtered to the requested product scope
-    # Important Logic:
-    #   - Transaction tables without `sku_family` are scoped through the part
-    #     numbers observed in the filtered inventory snapshot
-    # ================================
+def filter_sku_families(
+    df: pd.DataFrame,
+    sku_families: Optional[Sequence[str]],
+    allowed_parts: Optional[Sequence[str]] = None,
+) -> pd.DataFrame:
     if not sku_families:
         return df
     if "sku_family" in df.columns:
@@ -82,15 +56,6 @@ def filter_sku_families(df: pd.DataFrame, sku_families: Optional[Sequence[str]],
 
 
 def evaluate_status(value: float, threshold: KPIThreshold) -> str:
-    # ================================
-    # Function: evaluate_status
-    # Purpose: Converts a KPI value into a business health status.
-    # Inputs:
-    #   - value (float): computed KPI value
-    #   - threshold (KPIThreshold): threshold rule from config
-    # Output:
-    #   - str status: green, amber, red, or info
-    # ================================
     if threshold.direction == "info" or threshold.target is None:
         return "info"
     if threshold.direction == "ge":
@@ -115,22 +80,11 @@ def evaluate_status(value: float, threshold: KPIThreshold) -> str:
 
 
 def format_value(value: float, unit: str) -> str:
-    # ================================
-    # Function: format_value
-    # Purpose: Formats raw KPI values for human-readable outputs.
-    # Inputs:
-    #   - value (float): raw KPI value
-    #   - unit (str): unit type such as pct, days, qty, or count
-    # Output:
-    #   - str display value
-    # ================================
     if unit == "pct":
         return f"{value * 100:.1f}%"
     if unit == "days":
         return f"{value:.1f} days"
-    if unit == "qty":
-        return f"{value:,.0f}"
-    if unit == "count":
+    if unit in {"qty", "count"}:
         return f"{value:,.0f}"
     if unit == "text":
         return str(value)
@@ -138,14 +92,6 @@ def format_value(value: float, unit: str) -> str:
 
 
 def format_target(threshold: KPIThreshold) -> Optional[str]:
-    # ================================
-    # Function: format_target
-    # Purpose: Formats the target rule shown beside a KPI.
-    # Inputs:
-    #   - threshold (KPIThreshold): threshold configuration
-    # Output:
-    #   - Optional[str] display-ready target text
-    # ================================
     if threshold.direction == "info" or threshold.target is None:
         return None
     if threshold.direction == "ge":
@@ -164,7 +110,6 @@ def format_target(threshold: KPIThreshold) -> Optional[str]:
 
 
 def _top_labels(series: pd.Series, count: int = 2) -> List[str]:
-    # Returns the first few non-empty index labels from a ranked Series.
     labels: List[str] = []
     for item in series.index.tolist()[:count]:
         text = str(item).strip()
@@ -174,7 +119,6 @@ def _top_labels(series: pd.Series, count: int = 2) -> List[str]:
 
 
 def _generic_comment(value: float, threshold: KPIThreshold) -> str:
-    # Produces a short deterministic comment from the KPI threshold logic.
     status = evaluate_status(value, threshold)
     if threshold.direction == "info" or threshold.target is None:
         return "Informational KPI"
@@ -209,19 +153,6 @@ def build_kpi(
     note: str = "",
     display_override: Optional[str] = None,
 ) -> Dict:
-    # ================================
-    # Function: build_kpi
-    # Purpose: Packages a computed KPI into the standard output structure.
-    # Inputs:
-    #   - name (str): KPI name matching threshold config
-    #   - value (float): computed KPI value
-    #   - formula (str): traceable calculation expression
-    #   - source_table (str): originating dataset
-    #   - grain (str): reporting grain description
-    #   - note (str): optional extra context
-    # Output:
-    #   - Dict containing value, display text, status, target, and metadata
-    # ================================
     threshold = THRESHOLDS[name]
     return {
         "name": name,
@@ -238,28 +169,445 @@ def build_kpi(
     }
 
 
-def compute_inbound_kpis(inbound: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp, sku_families: Optional[Sequence[str]] = None, allowed_parts: Optional[Sequence[str]] = None) -> Dict:
-    # ================================
-    # Function: compute_inbound_kpis
-    # Purpose: Computes inbound supply KPIs for the requested period and scope.
-    # Inputs:
-    #   - inbound (pd.DataFrame): inbound receipts dataset
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - sku_families (Optional[Sequence[str]])
-    #   - allowed_parts (Optional[Sequence[str]]): part-level scope fallback
-    # Output:
-    #   - Dict containing the Inbound section and its KPIs
-    # ================================
+def _inventory_part_mapping(inventory: pd.DataFrame, column: str) -> Dict[str, str]:
+    if "part_number" not in inventory.columns or column not in inventory.columns:
+        return {}
+    mapping_source = inventory[["part_number", column]].dropna().drop_duplicates()
+    if mapping_source.empty:
+        return {}
+    mapping_source = mapping_source.sort_values(["part_number", column]).drop_duplicates(subset=["part_number"], keep="first")
+    return dict(zip(mapping_source["part_number"].astype(str), mapping_source[column].astype(str)))
+
+
+def _enrich_inbound_outbound_dimensions(df: pd.DataFrame, inventory: pd.DataFrame, *, date_alias: str) -> pd.DataFrame:
+    enriched = df.copy()
+    sku_family_map = _inventory_part_mapping(inventory, "sku_family")
+    if "sku_family" not in enriched.columns and "part_number" in enriched.columns and sku_family_map:
+        enriched["sku_family"] = enriched["part_number"].astype(str).map(sku_family_map)
+    if date_alias not in enriched.columns:
+        if date_alias == "receipt_date" and "received_date" in enriched.columns:
+            enriched[date_alias] = enriched["received_date"]
+        elif date_alias == "ship_date" and "shipped_date" in enriched.columns:
+            enriched[date_alias] = enriched["shipped_date"]
+    return enriched
+
+
+def _prepare_inventory_drilldown_df(df: pd.DataFrame) -> pd.DataFrame:
+    prepared = df.copy()
+    if "snapshot_date" in prepared.columns:
+        prepared["snapshot_date"] = pd.to_datetime(prepared["snapshot_date"], errors="coerce")
+    return prepared
+
+
+def _prepare_warehouse_productivity_drilldown_df(df: pd.DataFrame) -> pd.DataFrame:
+    prepared = df.copy()
+    if "date" in prepared.columns:
+        prepared["operation_date"] = pd.to_datetime(prepared["date"], errors="coerce")
+    return prepared
+
+
+def _prepare_employee_productivity_drilldown_df(df: pd.DataFrame) -> pd.DataFrame:
+    prepared = df.copy()
+    if "date" in prepared.columns:
+        prepared["work_date"] = pd.to_datetime(prepared["date"], errors="coerce")
+    return prepared
+
+
+def _group_key_sortable(value: object) -> object:
+    if pd.isna(value):
+        return ""
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return str(value)
+
+
+def _serialize_dimension_value(value: object) -> object:
+    if pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.date().isoformat()
+    return value.item() if hasattr(value, "item") else value
+
+
+def _serialize_filters(
+    *,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    warehouses: Optional[Sequence[str]],
+    sku_families: Optional[Sequence[str]],
+) -> Dict[str, object]:
+    return {
+        "reporting_period": {
+            "start_date": start.date().isoformat(),
+            "end_date": end.date().isoformat(),
+        },
+        "warehouse_filter": list(warehouses) if warehouses else None,
+        "sku_family_filter": list(sku_families) if sku_families else None,
+    }
+
+
+def _metric_snapshot(spec: MetricSpec, frame: pd.DataFrame, grain: str) -> Dict:
+    value = float(spec.compute(frame))
+    return build_kpi(
+        name=spec.name,
+        value=value,
+        formula=spec.formula,
+        source_table=spec.source_table,
+        grain=grain,
+    )
+
+
+def _build_drilldown_unavailable(
+    *,
+    drilldown_id: str,
+    group_by: Sequence[str],
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    reason: str,
+) -> Dict:
+    return {
+        "id": drilldown_id,
+        "label": drilldown_id.replace("_", " ").title(),
+        "available": False,
+        "group_by": list(group_by),
+        "dimension_labels": {column: DRILLDOWN_DIMENSION_LABELS.get(column, column.replace("_", " ").title()) for column in group_by},
+        "source_dataset": source_dataset,
+        "applied_filters": applied_filters,
+        "logic_note": "Requested drill-down could not be generated because one or more dimensions are unavailable in the scoped data.",
+        "unavailable_reason": reason,
+        "rows": [],
+    }
+
+
+def _period_series(series: pd.Series, grain: str) -> pd.Series:
+    timestamps = pd.to_datetime(series, errors="coerce")
+    if grain == "day":
+        return timestamps.dt.normalize()
+    if grain == "week":
+        return timestamps.dt.to_period("W-MON").dt.start_time
+    if grain == "month":
+        return timestamps.dt.to_period("M").dt.start_time
+    raise ValueError(f"Unsupported date grain: {grain}")
+
+
+def _build_drilldown_rows(
+    df: pd.DataFrame,
+    *,
+    group_by: Sequence[str],
+    metric_specs: Sequence[MetricSpec],
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    logic_note: str,
+    drilldown_id: str,
+    label: str,
+) -> Dict:
+    missing = [column for column in group_by if column not in df.columns]
+    if missing:
+        return _build_drilldown_unavailable(
+            drilldown_id=drilldown_id,
+            group_by=group_by,
+            source_dataset=source_dataset,
+            applied_filters=applied_filters,
+            reason=f"Missing columns: {', '.join(missing)}",
+        )
+
+    scoped = df.dropna(subset=list(group_by)).copy()
+    if scoped.empty:
+        return {
+            "id": drilldown_id,
+            "label": label,
+            "available": True,
+            "group_by": list(group_by),
+            "dimension_labels": {column: DRILLDOWN_DIMENSION_LABELS.get(column, column.replace("_", " ").title()) for column in group_by},
+            "source_dataset": source_dataset,
+            "applied_filters": applied_filters,
+            "logic_note": logic_note,
+            "unavailable_reason": None,
+            "formula_notes": [{"kpi": spec.name, "formula": spec.formula} for spec in metric_specs],
+            "rows": [],
+        }
+
+    rows: List[Dict] = []
+    grouped = scoped.groupby(list(group_by), dropna=False, sort=True)
+    for keys, frame in grouped:
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row = {"row_count": int(len(frame)), "metrics": {}}
+        for column, key in zip(group_by, keys):
+            row[column] = _serialize_dimension_value(key)
+        for spec in metric_specs:
+            row["metrics"][spec.name] = _metric_snapshot(spec, frame, grain=f"grouped by {', '.join(group_by)}")
+        rows.append(row)
+
+    rows.sort(key=lambda item: tuple(_group_key_sortable(item.get(column)) for column in group_by))
+    return {
+        "id": drilldown_id,
+        "label": label,
+        "available": True,
+        "group_by": list(group_by),
+        "dimension_labels": {column: DRILLDOWN_DIMENSION_LABELS.get(column, column.replace("_", " ").title()) for column in group_by},
+        "source_dataset": source_dataset,
+        "applied_filters": applied_filters,
+        "logic_note": logic_note,
+        "unavailable_reason": None,
+        "formula_notes": [{"kpi": spec.name, "formula": spec.formula} for spec in metric_specs],
+        "rows": rows,
+    }
+
+
+def build_grouped_drilldown_table(
+    df: pd.DataFrame,
+    *,
+    drilldown_id: str,
+    group_by: Sequence[str],
+    metric_specs: Sequence[MetricSpec],
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    label: Optional[str] = None,
+    logic_note: Optional[str] = None,
+) -> Dict:
+    return _build_drilldown_rows(
+        df=df,
+        group_by=group_by,
+        metric_specs=metric_specs,
+        source_dataset=source_dataset,
+        applied_filters=applied_filters,
+        logic_note=logic_note or "Grouped KPI view uses the same deterministic formulas as the top-level section KPIs.",
+        drilldown_id=drilldown_id,
+        label=label or drilldown_id.replace("_", " ").title(),
+    )
+
+
+def build_time_grain_drilldown(
+    df: pd.DataFrame,
+    *,
+    drilldown_id: str,
+    date_column: str,
+    metric_specs: Sequence[MetricSpec],
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    label: str,
+) -> Dict:
+    if date_column not in df.columns:
+        return _build_drilldown_unavailable(
+            drilldown_id=drilldown_id,
+            group_by=[date_column],
+            source_dataset=source_dataset,
+            applied_filters=applied_filters,
+            reason=f"Missing column: {date_column}",
+        )
+
+    prepared = df.copy()
+    prepared[date_column] = pd.to_datetime(prepared[date_column], errors="coerce")
+    if prepared[date_column].dropna().empty:
+        return _build_drilldown_unavailable(
+            drilldown_id=drilldown_id,
+            group_by=[date_column],
+            source_dataset=source_dataset,
+            applied_filters=applied_filters,
+            reason=f"Column {date_column} has no valid dates after filtering.",
+        )
+
+    grain_tables: Dict[str, Dict] = {}
+    for grain in ["day", "week", "month"]:
+        grain_column = f"{date_column}_{grain}"
+        grain_df = prepared.copy()
+        grain_df[grain_column] = _period_series(grain_df[date_column], grain)
+        grain_tables[grain] = _build_drilldown_rows(
+            df=grain_df,
+            group_by=[grain_column],
+            metric_specs=metric_specs,
+            source_dataset=source_dataset,
+            applied_filters=applied_filters,
+            logic_note=f"Grouped by {grain} using the same deterministic formulas as the top-level section KPIs.",
+            drilldown_id=f"{drilldown_id}_{grain}",
+            label=f"{label} ({grain.title()})",
+        )
+
+    return {
+        "id": drilldown_id,
+        "label": label,
+        "available": True,
+        "group_by": [date_column],
+        "dimension_labels": {date_column: DRILLDOWN_DIMENSION_LABELS.get(date_column, date_column.replace("_", " ").title())},
+        "source_dataset": source_dataset,
+        "applied_filters": applied_filters,
+        "logic_note": "Time drill-down is available at day, week, and month grain using the same deterministic formulas as the top-level section KPIs.",
+        "unavailable_reason": None,
+        "available_grains": ["day", "week", "month"],
+        "rows": grain_tables["day"]["rows"],
+        "grain_tables": grain_tables,
+    }
+
+
+def _section_payload(name: str, kpis: List[Dict], drilldowns: Dict[str, Dict]) -> Dict:
+    return {
+        "name": name,
+        "section": name.lower().replace(" ", "_"),
+        "kpis": kpis,
+        "drilldowns": drilldowns,
+    }
+
+
+def build_ranked_text_drilldown(
+    *,
+    drilldown_id: str,
+    label: str,
+    source_dataset: str,
+    applied_filters: Dict[str, object],
+    dimension_column: str,
+    metric_label: str,
+    formula: str,
+    ranked_series: pd.Series,
+    logic_note: str,
+) -> Dict:
+    rows: List[Dict] = []
+    for rank, (dimension_value, metric_value) in enumerate(ranked_series.items(), start=1):
+        rows.append({
+            "rank": rank,
+            dimension_column: _serialize_dimension_value(dimension_value),
+            "metrics": {
+                metric_label: {
+                    "name": metric_label,
+                    "value": float(metric_value),
+                    "display_value": format_value(float(metric_value), "qty"),
+                    "unit": "qty",
+                    "status": "info",
+                    "target": None,
+                    "target_display": None,
+                    "formula": formula,
+                    "source_table": source_dataset,
+                    "grain": f"ranked by {dimension_column}",
+                    "note": logic_note,
+                }
+            },
+        })
+    return {
+        "id": drilldown_id,
+        "label": label,
+        "available": True,
+        "group_by": ["rank", dimension_column],
+        "dimension_labels": {
+            "rank": "Rank",
+            dimension_column: DRILLDOWN_DIMENSION_LABELS.get(dimension_column, dimension_column.replace("_", " ").title()),
+        },
+        "source_dataset": source_dataset,
+        "applied_filters": applied_filters,
+        "logic_note": logic_note,
+        "unavailable_reason": None,
+        "formula_notes": [{"kpi": metric_label, "formula": formula}],
+        "rows": rows,
+    }
+
+
+def _inbound_metric_specs() -> List[MetricSpec]:
+    return [
+        MetricSpec("Average Inbound Lead Time", "AVG(inbound_lead_time_days)", "inbound_parts", lambda frame: frame["inbound_lead_time_days"].mean() if not frame.empty else 0.0),
+        MetricSpec("Receipts On-Time %", "COUNT(received_date <= expected_date) / COUNT(*)", "inbound_parts", lambda frame: float((frame["received_date"] <= frame["expected_date"]).mean()) if not frame.empty else 0.0),
+        MetricSpec("Quantity Discrepancy %", "SUM(discrepancy_qty) / SUM(qty_ordered)", "inbound_parts", lambda frame: safe_divide(frame["discrepancy_qty"].sum(), frame["qty_ordered"].sum())),
+        MetricSpec("Inbound Volume", "SUM(qty_received)", "inbound_parts", lambda frame: float(frame["qty_received"].sum())),
+        MetricSpec("Late Receipt Count", "COUNT(received_date > expected_date)", "inbound_parts", lambda frame: float((frame["received_date"] > frame["expected_date"]).sum())),
+    ]
+
+
+def _outbound_metric_specs() -> List[MetricSpec]:
+    return [
+        MetricSpec("Fill Rate %", "SUM(qty_shipped) / SUM(qty_ordered)", "outbound_parts", lambda frame: safe_divide(frame["qty_shipped"].sum(), frame["qty_ordered"].sum())),
+        MetricSpec("OTIF %", "SUM(otif_flag) / COUNT(*)", "outbound_parts", lambda frame: float(frame["otif_flag"].mean()) if not frame.empty else 0.0),
+        MetricSpec("Backorder Rate %", "SUM(backorder_qty) / SUM(qty_ordered)", "outbound_parts", lambda frame: safe_divide(frame["backorder_qty"].sum(), frame["qty_ordered"].sum())),
+        MetricSpec("Outbound Volume", "SUM(qty_shipped)", "outbound_parts", lambda frame: float(frame["qty_shipped"].sum())),
+        MetricSpec("Late Shipment Count", "COUNT(shipped_date > promise_date)", "outbound_parts", lambda frame: float((frame["shipped_date"] > frame["promise_date"]).sum())),
+    ]
+
+
+def _inventory_metric_specs() -> List[MetricSpec]:
+    return [
+        MetricSpec("Days of Supply", "AVG(days_of_supply)", "inventory_snapshot", lambda frame: frame["days_of_supply"].mean() if not frame.empty else 0.0),
+        MetricSpec("Stockout Exposure %", "SUM(stockout_flag) / COUNT(*)", "inventory_snapshot", lambda frame: float(frame["stockout_flag"].mean()) if not frame.empty else 0.0),
+        MetricSpec("Safety Stock Coverage %", "COUNT(available_qty >= safety_stock) / COUNT(*)", "inventory_snapshot", lambda frame: float((frame["available_qty"] >= frame["safety_stock"]).mean()) if not frame.empty else 0.0),
+        MetricSpec("Aged Inventory % (>180d)", "COUNT(age_days > 180) / COUNT(*)", "inventory_snapshot", lambda frame: float((frame["age_days"] > 180).mean()) if not frame.empty else 0.0),
+        MetricSpec("Average Inventory Age", "AVG(age_days)", "inventory_snapshot", lambda frame: frame["age_days"].mean() if not frame.empty else 0.0),
+    ]
+
+
+def _warehouse_productivity_metric_specs() -> List[MetricSpec]:
+    return [
+        MetricSpec("Lines Picked per Labor-Hour", "SUM(lines_picked) / SUM(labor_hours)", "warehouse_productivity", lambda frame: safe_divide(frame["lines_picked"].sum(), frame["labor_hours"].sum())),
+        MetricSpec("Orders Processed per Labor-Hour", "SUM(orders_processed) / SUM(labor_hours)", "warehouse_productivity", lambda frame: safe_divide(frame["orders_processed"].sum(), frame["labor_hours"].sum())),
+        MetricSpec("Orders per Day", "SUM(orders_processed) / COUNT(DISTINCT date)", "warehouse_productivity", lambda frame: safe_divide(frame["orders_processed"].sum(), frame["date"].nunique() if "date" in frame.columns else 0.0)),
+        MetricSpec("SLA Adherence %", "AVG(sla_adherence_pct)", "warehouse_productivity", lambda frame: frame["sla_adherence_pct"].mean() if not frame.empty else 0.0),
+        MetricSpec("Equipment Utilization %", "AVG(equipment_utilization_pct)", "warehouse_productivity", lambda frame: frame["equipment_utilization_pct"].mean() if not frame.empty else 0.0),
+        MetricSpec("Touches per Order", "AVG(touches_per_order)", "warehouse_productivity", lambda frame: frame["touches_per_order"].mean() if not frame.empty else 0.0),
+    ]
+
+
+def _employee_productivity_metric_specs() -> List[MetricSpec]:
+    return [
+        MetricSpec("Picks per Person per Hour", "SUM(picks) / SUM(hours_worked)", "employee_productivity", lambda frame: safe_divide(frame["picks"].sum(), frame["hours_worked"].sum())),
+        MetricSpec("Error Rate %", "SUM(errors) / SUM(tasks_completed)", "employee_productivity", lambda frame: safe_divide(frame["errors"].sum(), frame["tasks_completed"].sum())),
+        MetricSpec("Rework Rate %", "SUM(rework) / SUM(tasks_completed)", "employee_productivity", lambda frame: safe_divide(frame["rework"].sum(), frame["tasks_completed"].sum())),
+        MetricSpec("Overtime %", "SUM(overtime_hours) / SUM(hours_worked + overtime_hours)", "employee_productivity", lambda frame: safe_divide(frame["overtime_hours"].sum(), (frame["hours_worked"] + frame["overtime_hours"]).sum())),
+        MetricSpec("Average Tasks per Employee", "AVG(tasks_completed)", "employee_productivity", lambda frame: frame["tasks_completed"].mean() if not frame.empty else 0.0),
+    ]
+
+
+def _build_section_drilldowns(
+    *,
+    section_name: str,
+    drilldown_df: pd.DataFrame,
+    metric_specs: Sequence[MetricSpec],
+    applied_filters: Dict[str, object],
+) -> Dict[str, Dict]:
+    config = DRILLDOWN_CONFIG[section_name]
+    source_dataset = str(config["source_dataset"])
+    dimensions = config["dimensions"]  # type: ignore[assignment]
+    drilldowns: Dict[str, Dict] = {}
+
+    for drilldown_id in config["dimension_order"]:  # type: ignore[index]
+        group_by = list(dimensions[drilldown_id])  # type: ignore[index]
+        if drilldown_id == "by_date":
+            drilldowns[drilldown_id] = build_time_grain_drilldown(
+                drilldown_df,
+                drilldown_id=drilldown_id,
+                date_column=group_by[0],
+                metric_specs=metric_specs,
+                source_dataset=source_dataset,
+                applied_filters=applied_filters,
+                label="By Date",
+            )
+        else:
+            drilldowns[drilldown_id] = build_grouped_drilldown_table(
+                drilldown_df,
+                drilldown_id=drilldown_id,
+                group_by=group_by,
+                metric_specs=metric_specs,
+                source_dataset=source_dataset,
+                applied_filters=applied_filters,
+                label=drilldown_id.replace("_", " ").title(),
+            )
+    return drilldowns
+
+
+def compute_inbound_kpis(
+    inbound: pd.DataFrame,
+    inventory: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    sku_families: Optional[Sequence[str]] = None,
+    allowed_parts: Optional[Sequence[str]] = None,
+    warehouses: Optional[Sequence[str]] = None,
+) -> Dict:
     df = filter_period(inbound, "received_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
-    # Each KPI is computed directly from operational fields so the output stays
-    # fully traceable to source tables.
-    lead_time = df["inbound_lead_time_days"].mean() if not df.empty else 0.0
-    on_time_pct = float((df["received_date"] <= df["expected_date"]).mean()) if not df.empty else 0.0
-    discrepancy_pct = safe_divide(df["discrepancy_qty"].sum(), df["qty_ordered"].sum())
-    volume = float(df["qty_received"].sum())
-    late_count = float((df["received_date"] > df["expected_date"]).sum())
+    metric_specs = _inbound_metric_specs()
+    metric_lookup = {spec.name: spec for spec in metric_specs}
+
+    lead_time = metric_lookup["Average Inbound Lead Time"].compute(df)
+    on_time_pct = metric_lookup["Receipts On-Time %"].compute(df)
+    discrepancy_pct = metric_lookup["Quantity Discrepancy %"].compute(df)
+    volume = metric_lookup["Inbound Volume"].compute(df)
+    late_count = metric_lookup["Late Receipt Count"].compute(df)
+
     late_supplier_volume = (
         df.loc[df["received_date"] > df["expected_date"]]
         .groupby("supplier_name", dropna=False)["qty_ordered"]
@@ -292,11 +640,11 @@ def compute_inbound_kpis(inbound: pd.DataFrame, start: pd.Timestamp, end: pd.Tim
     )
 
     kpis = [
-        build_kpi("Average Inbound Lead Time", lead_time, "AVG(inbound_lead_time_days)", "inbound_parts", "reporting period", note=lead_time_comment),
-        build_kpi("Receipts On-Time %", on_time_pct, "COUNT(received_date <= expected_date) / COUNT(*)", "inbound_parts", "reporting period", note=on_time_comment),
-        build_kpi("Quantity Discrepancy %", discrepancy_pct, "SUM(discrepancy_qty) / SUM(qty_ordered)", "inbound_parts", "reporting period", note=discrepancy_comment),
-        build_kpi("Inbound Volume", volume, "SUM(qty_received)", "inbound_parts", "reporting period", note=volume_comment),
-        build_kpi("Late Receipt Count", late_count, "COUNT(received_date > expected_date)", "inbound_parts", "reporting period", note=late_count_comment),
+        build_kpi("Average Inbound Lead Time", lead_time, metric_lookup["Average Inbound Lead Time"].formula, "inbound_parts", "reporting period", note=lead_time_comment),
+        build_kpi("Receipts On-Time %", on_time_pct, metric_lookup["Receipts On-Time %"].formula, "inbound_parts", "reporting period", note=on_time_comment),
+        build_kpi("Quantity Discrepancy %", discrepancy_pct, metric_lookup["Quantity Discrepancy %"].formula, "inbound_parts", "reporting period", note=discrepancy_comment),
+        build_kpi("Inbound Volume", volume, metric_lookup["Inbound Volume"].formula, "inbound_parts", "reporting period", note=volume_comment),
+        build_kpi("Late Receipt Count", late_count, metric_lookup["Late Receipt Count"].formula, "inbound_parts", "reporting period", note=late_count_comment),
         build_kpi(
             "Top 5 Delaying Suppliers",
             float(len(late_supplier_volume)),
@@ -307,29 +655,47 @@ def compute_inbound_kpis(inbound: pd.DataFrame, start: pd.Timestamp, end: pd.Tim
             display_override=top_delaying_suppliers,
         ),
     ]
-    return {"name": "Inbound", "kpis": kpis}
+
+    drilldowns = _build_section_drilldowns(
+        section_name="Inbound",
+        drilldown_df=_enrich_inbound_outbound_dimensions(df, inventory, date_alias="receipt_date"),
+        metric_specs=metric_specs,
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+    )
+    drilldowns["by_late_supplier_rank"] = build_ranked_text_drilldown(
+        drilldown_id="by_late_supplier_rank",
+        label="Late Suppliers Ranking",
+        source_dataset="inbound_parts",
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+        dimension_column="supplier_name",
+        metric_label="Late Ordered Quantity",
+        formula="TOP supplier_name BY SUM(qty_ordered) WHERE received_date > expected_date",
+        ranked_series=late_supplier_volume,
+        logic_note="Ranks suppliers by ordered quantity tied to late receipts in the selected period.",
+    )
+    return _section_payload("Inbound", kpis, drilldowns)
 
 
-def compute_outbound_kpis(outbound: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp, sku_families: Optional[Sequence[str]] = None, allowed_parts: Optional[Sequence[str]] = None) -> Dict:
-    # ================================
-    # Function: compute_outbound_kpis
-    # Purpose: Computes outbound service KPIs such as fill rate and OTIF.
-    # Inputs:
-    #   - outbound (pd.DataFrame): outbound orders dataset
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - sku_families (Optional[Sequence[str]])
-    #   - allowed_parts (Optional[Sequence[str]]): part-level scope fallback
-    # Output:
-    #   - Dict containing the Outbound section and its KPIs
-    # ================================
+def compute_outbound_kpis(
+    outbound: pd.DataFrame,
+    inventory: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    sku_families: Optional[Sequence[str]] = None,
+    allowed_parts: Optional[Sequence[str]] = None,
+    warehouses: Optional[Sequence[str]] = None,
+) -> Dict:
     df = filter_period(outbound, "shipped_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
-    fill_rate = safe_divide(df["qty_shipped"].sum(), df["qty_ordered"].sum())
-    otif = float(df["otif_flag"].mean()) if not df.empty else 0.0
-    backorder_rate = safe_divide(df["backorder_qty"].sum(), df["qty_ordered"].sum())
-    volume = float(df["qty_shipped"].sum())
-    late_shipments = float((df["shipped_date"] > df["promise_date"]).sum())
+    metric_specs = _outbound_metric_specs()
+    metric_lookup = {spec.name: spec for spec in metric_specs}
+
+    fill_rate = metric_lookup["Fill Rate %"].compute(df)
+    otif = metric_lookup["OTIF %"].compute(df)
+    backorder_rate = metric_lookup["Backorder Rate %"].compute(df)
+    volume = metric_lookup["Outbound Volume"].compute(df)
+    late_shipments = metric_lookup["Late Shipment Count"].compute(df)
+
     top_backorder_skus = (
         df.groupby("part_number", dropna=False)["backorder_qty"]
         .sum()
@@ -373,11 +739,11 @@ def compute_outbound_kpis(outbound: pd.DataFrame, start: pd.Timestamp, end: pd.T
     )
 
     kpis = [
-        build_kpi("Fill Rate %", fill_rate, "SUM(qty_shipped) / SUM(qty_ordered)", "outbound_parts", "reporting period", note=fill_rate_comment),
-        build_kpi("OTIF %", otif, "SUM(otif_flag) / COUNT(*)", "outbound_parts", "reporting period", note=otif_comment),
-        build_kpi("Backorder Rate %", backorder_rate, "SUM(backorder_qty) / SUM(qty_ordered)", "outbound_parts", "reporting period", note=backorder_comment),
-        build_kpi("Outbound Volume", volume, "SUM(qty_shipped)", "outbound_parts", "reporting period", note=volume_comment),
-        build_kpi("Late Shipment Count", late_shipments, "COUNT(shipped_date > promise_date)", "outbound_parts", "reporting period", note=late_shipments_comment),
+        build_kpi("Fill Rate %", fill_rate, metric_lookup["Fill Rate %"].formula, "outbound_parts", "reporting period", note=fill_rate_comment),
+        build_kpi("OTIF %", otif, metric_lookup["OTIF %"].formula, "outbound_parts", "reporting period", note=otif_comment),
+        build_kpi("Backorder Rate %", backorder_rate, metric_lookup["Backorder Rate %"].formula, "outbound_parts", "reporting period", note=backorder_comment),
+        build_kpi("Outbound Volume", volume, metric_lookup["Outbound Volume"].formula, "outbound_parts", "reporting period", note=volume_comment),
+        build_kpi("Late Shipment Count", late_shipments, metric_lookup["Late Shipment Count"].formula, "outbound_parts", "reporting period", note=late_shipments_comment),
         build_kpi(
             "Top 10 SKUs by Backorder",
             float(len(top_backorder_skus)),
@@ -388,7 +754,25 @@ def compute_outbound_kpis(outbound: pd.DataFrame, start: pd.Timestamp, end: pd.T
             display_override=backorder_sku_display,
         ),
     ]
-    return {"name": "Outbound", "kpis": kpis}
+
+    drilldowns = _build_section_drilldowns(
+        section_name="Outbound",
+        drilldown_df=_enrich_inbound_outbound_dimensions(df, inventory, date_alias="ship_date"),
+        metric_specs=metric_specs,
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+    )
+    drilldowns["by_backorder_sku_rank"] = build_ranked_text_drilldown(
+        drilldown_id="by_backorder_sku_rank",
+        label="Backorder SKU Ranking",
+        source_dataset="outbound_parts",
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+        dimension_column="part_number",
+        metric_label="Backorder Quantity",
+        formula="TOP part_number BY SUM(backorder_qty)",
+        ranked_series=top_backorder_skus,
+        logic_note="Ranks part numbers by backordered quantity in the selected period.",
+    )
+    return _section_payload("Outbound", kpis, drilldowns)
 
 
 def compute_inventory_kpis(
@@ -400,28 +784,20 @@ def compute_inventory_kpis(
     sku_families: Optional[Sequence[str]] = None,
     allowed_parts: Optional[Sequence[str]] = None,
 ) -> Dict:
-    # ================================
-    # Function: compute_inventory_kpis
-    # Purpose: Computes inventory risk and coverage KPIs.
-    # Inputs:
-    #   - inventory (pd.DataFrame): inventory snapshot dataset
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - warehouses (Optional[Sequence[str]]): warehouse scope
-    #   - sku_families (Optional[Sequence[str]]): SKU-family scope
-    # Output:
-    #   - Dict containing the Inventory section and its KPIs
-    # ================================
     df = filter_period(inventory, "snapshot_date", start, end)
     df = filter_warehouses(df, warehouses)
     df = filter_sku_families(df, sku_families)
     outbound_df = filter_period(outbound, "shipped_date", start, end)
     outbound_df = filter_sku_families(outbound_df, sku_families, allowed_parts)
-    dos = df["days_of_supply"].mean() if not df.empty else 0.0
-    stockout = float(df["stockout_flag"].mean()) if not df.empty else 0.0
-    safety_coverage = float((df["available_qty"] >= df["safety_stock"]).mean()) if not df.empty else 0.0
-    aged_pct = float((df["age_days"] > 180).mean()) if not df.empty else 0.0
-    avg_age = df["age_days"].mean() if not df.empty else 0.0
+    metric_specs = _inventory_metric_specs()
+    metric_lookup = {spec.name: spec for spec in metric_specs}
+
+    dos = metric_lookup["Days of Supply"].compute(df)
+    stockout = metric_lookup["Stockout Exposure %"].compute(df)
+    safety_coverage = metric_lookup["Safety Stock Coverage %"].compute(df)
+    aged_pct = metric_lookup["Aged Inventory % (>180d)"].compute(df)
+    avg_age = metric_lookup["Average Inventory Age"].compute(df)
+
     periods_in_month = max(end.days_in_month, 1)
     avg_daily_issues = safe_divide(outbound_df["qty_shipped"].sum(), periods_in_month)
     avg_on_hand = float(df["on_hand_qty"].mean()) if not df.empty else 0.0
@@ -466,19 +842,12 @@ def compute_inventory_kpis(
     avg_age_comment = "Average inventory age across the selected scope"
 
     kpis = [
-        build_kpi("Days of Supply", dos, "AVG(days_of_supply)", "inventory_snapshot", "reporting period", note=dos_comment),
-        build_kpi("Stockout Exposure %", stockout, "SUM(stockout_flag) / COUNT(*)", "inventory_snapshot", "reporting period", note=stockout_comment),
-        build_kpi("Safety Stock Coverage %", safety_coverage, "COUNT(available_qty >= safety_stock) / COUNT(*)", "inventory_snapshot", "reporting period", note=safety_stock_comment),
-        build_kpi("Aged Inventory % (>180d)", aged_pct, "COUNT(age_days > 180) / COUNT(*)", "inventory_snapshot", "reporting period", note=aged_pct_comment),
-        build_kpi("Average Inventory Age", avg_age, "AVG(age_days)", "inventory_snapshot", "reporting period", note=avg_age_comment),
-        build_kpi(
-            "Inventory Turns",
-            inventory_turns,
-            "ANNUALIZED SUM(qty_shipped) / AVG(on_hand_qty)",
-            "inventory_snapshot + outbound_parts",
-            "reporting period",
-            note=turns_note,
-        ),
+        build_kpi("Days of Supply", dos, metric_lookup["Days of Supply"].formula, "inventory_snapshot", "reporting period", note=dos_comment),
+        build_kpi("Stockout Exposure %", stockout, metric_lookup["Stockout Exposure %"].formula, "inventory_snapshot", "reporting period", note=stockout_comment),
+        build_kpi("Safety Stock Coverage %", safety_coverage, metric_lookup["Safety Stock Coverage %"].formula, "inventory_snapshot", "reporting period", note=safety_stock_comment),
+        build_kpi("Aged Inventory % (>180d)", aged_pct, metric_lookup["Aged Inventory % (>180d)"].formula, "inventory_snapshot", "reporting period", note=aged_pct_comment),
+        build_kpi("Average Inventory Age", avg_age, metric_lookup["Average Inventory Age"].formula, "inventory_snapshot", "reporting period", note=avg_age_comment),
+        build_kpi("Inventory Turns", inventory_turns, "ANNUALIZED SUM(qty_shipped) / AVG(on_hand_qty)", "inventory_snapshot + outbound_parts", "reporting period", note=turns_note),
         build_kpi(
             "Aged Inventory Value >180d",
             aged_inventory_value,
@@ -488,30 +857,34 @@ def compute_inventory_kpis(
             note=aged_value_note,
         ),
     ]
-    return {"name": "Inventory", "kpis": kpis}
+
+    drilldowns = _build_section_drilldowns(
+        section_name="Inventory",
+        drilldown_df=_prepare_inventory_drilldown_df(df),
+        metric_specs=metric_specs,
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=sku_families),
+    )
+    return _section_payload("Inventory", kpis, drilldowns)
 
 
-def compute_warehouse_productivity_kpis(warehouse_df: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp, warehouses: Optional[Sequence[str]] = None) -> Dict:
-    # ================================
-    # Function: compute_warehouse_productivity_kpis
-    # Purpose: Computes warehouse throughput and SLA KPIs.
-    # Inputs:
-    #   - warehouse_df (pd.DataFrame): warehouse productivity dataset
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - warehouses (Optional[Sequence[str]]): warehouse scope
-    # Output:
-    #   - Dict containing the Warehouse Productivity section and its KPIs
-    # ================================
+def compute_warehouse_productivity_kpis(
+    warehouse_df: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    warehouses: Optional[Sequence[str]] = None,
+) -> Dict:
     df = filter_period(warehouse_df, "date", start, end)
     df = filter_warehouses(df, warehouses)
-    lines_per_hour = safe_divide(df["lines_picked"].sum(), df["labor_hours"].sum())
-    orders_per_hour = safe_divide(df["orders_processed"].sum(), df["labor_hours"].sum())
-    unique_days = float(df["date"].nunique()) if not df.empty else 0.0
-    orders_per_day = safe_divide(df["orders_processed"].sum(), unique_days)
-    sla = df["sla_adherence_pct"].mean() if not df.empty else 0.0
-    equip_util = df["equipment_utilization_pct"].mean() if not df.empty else 0.0
-    touches = df["touches_per_order"].mean() if not df.empty else 0.0
+    metric_specs = _warehouse_productivity_metric_specs()
+    metric_lookup = {spec.name: spec for spec in metric_specs}
+
+    lines_per_hour = metric_lookup["Lines Picked per Labor-Hour"].compute(df)
+    orders_per_hour = metric_lookup["Orders Processed per Labor-Hour"].compute(df)
+    orders_per_day = metric_lookup["Orders per Day"].compute(df)
+    sla = metric_lookup["SLA Adherence %"].compute(df)
+    equip_util = metric_lookup["Equipment Utilization %"].compute(df)
+    touches = metric_lookup["Touches per Order"].compute(df)
+
     weakest_shift_row = None
     if not df.empty:
         weakest_shift_row = df.assign(
@@ -534,35 +907,40 @@ def compute_warehouse_productivity_kpis(warehouse_df: pd.DataFrame, start: pd.Ti
     touches_comment = _generic_comment(touches, THRESHOLDS["Touches per Order"])
 
     kpis = [
-        build_kpi("Lines Picked per Labor-Hour", lines_per_hour, "SUM(lines_picked) / SUM(labor_hours)", "warehouse_productivity", "reporting period", note=lines_comment),
-        build_kpi("Orders Processed per Labor-Hour", orders_per_hour, "SUM(orders_processed) / SUM(labor_hours)", "warehouse_productivity", "reporting period", note=orders_per_hour_comment),
-        build_kpi("Orders per Day", orders_per_day, "SUM(orders_processed) / COUNT(DISTINCT date)", "warehouse_productivity", "reporting period", note=orders_per_day_comment),
-        build_kpi("SLA Adherence %", sla, "AVG(sla_adherence_pct)", "warehouse_productivity", "reporting period", note=sla_comment),
-        build_kpi("Equipment Utilization %", equip_util, "AVG(equipment_utilization_pct)", "warehouse_productivity", "reporting period", note=equipment_comment),
-        build_kpi("Touches per Order", touches, "AVG(touches_per_order)", "warehouse_productivity", "reporting period", note=touches_comment),
+        build_kpi("Lines Picked per Labor-Hour", lines_per_hour, metric_lookup["Lines Picked per Labor-Hour"].formula, "warehouse_productivity", "reporting period", note=lines_comment),
+        build_kpi("Orders Processed per Labor-Hour", orders_per_hour, metric_lookup["Orders Processed per Labor-Hour"].formula, "warehouse_productivity", "reporting period", note=orders_per_hour_comment),
+        build_kpi("Orders per Day", orders_per_day, metric_lookup["Orders per Day"].formula, "warehouse_productivity", "reporting period", note=orders_per_day_comment),
+        build_kpi("SLA Adherence %", sla, metric_lookup["SLA Adherence %"].formula, "warehouse_productivity", "reporting period", note=sla_comment),
+        build_kpi("Equipment Utilization %", equip_util, metric_lookup["Equipment Utilization %"].formula, "warehouse_productivity", "reporting period", note=equipment_comment),
+        build_kpi("Touches per Order", touches, metric_lookup["Touches per Order"].formula, "warehouse_productivity", "reporting period", note=touches_comment),
     ]
-    return {"name": "Warehouse Productivity", "kpis": kpis}
+
+    drilldowns = _build_section_drilldowns(
+        section_name="Warehouse Productivity",
+        drilldown_df=_prepare_warehouse_productivity_drilldown_df(df),
+        metric_specs=metric_specs,
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=None),
+    )
+    return _section_payload("Warehouse Productivity", kpis, drilldowns)
 
 
-def compute_employee_productivity_kpis(employee_df: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp, warehouses: Optional[Sequence[str]] = None) -> Dict:
-    # ================================
-    # Function: compute_employee_productivity_kpis
-    # Purpose: Computes workforce productivity, quality, and overtime KPIs.
-    # Inputs:
-    #   - employee_df (pd.DataFrame): employee productivity dataset
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - warehouses (Optional[Sequence[str]]): warehouse scope
-    # Output:
-    #   - Dict containing the Employee Productivity section and its KPIs
-    # ================================
+def compute_employee_productivity_kpis(
+    employee_df: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    warehouses: Optional[Sequence[str]] = None,
+) -> Dict:
     df = filter_period(employee_df, "date", start, end)
     df = filter_warehouses(df, warehouses)
-    picks_per_hour = safe_divide(df["picks"].sum(), df["hours_worked"].sum())
-    error_rate = safe_divide(df["errors"].sum(), df["tasks_completed"].sum())
-    rework_rate = safe_divide(df["rework"].sum(), df["tasks_completed"].sum())
-    overtime = safe_divide(df["overtime_hours"].sum(), (df["hours_worked"] + df["overtime_hours"]).sum())
-    avg_tasks = df["tasks_completed"].mean() if not df.empty else 0.0
+    metric_specs = _employee_productivity_metric_specs()
+    metric_lookup = {spec.name: spec for spec in metric_specs}
+
+    picks_per_hour = metric_lookup["Picks per Person per Hour"].compute(df)
+    error_rate = metric_lookup["Error Rate %"].compute(df)
+    rework_rate = metric_lookup["Rework Rate %"].compute(df)
+    overtime = metric_lookup["Overtime %"].compute(df)
+    avg_tasks = metric_lookup["Average Tasks per Employee"].compute(df)
+
     top_error_row = None
     if not df.empty:
         error_rows = df.loc[df["errors"] > 0].sort_values(["errors", "rework", "overtime_hours"], ascending=[False, False, False])
@@ -586,13 +964,20 @@ def compute_employee_productivity_kpis(employee_df: pd.DataFrame, start: pd.Time
     avg_tasks_comment = "Average task load per employee record"
 
     kpis = [
-        build_kpi("Picks per Person per Hour", picks_per_hour, "SUM(picks) / SUM(hours_worked)", "employee_productivity", "reporting period", note=picks_comment),
-        build_kpi("Error Rate %", error_rate, "SUM(errors) / SUM(tasks_completed)", "employee_productivity", "reporting period", note=error_comment),
-        build_kpi("Rework Rate %", rework_rate, "SUM(rework) / SUM(tasks_completed)", "employee_productivity", "reporting period", note=rework_comment),
-        build_kpi("Overtime %", overtime, "SUM(overtime_hours) / SUM(hours_worked + overtime_hours)", "employee_productivity", "reporting period", note=overtime_comment),
-        build_kpi("Average Tasks per Employee", avg_tasks, "AVG(tasks_completed)", "employee_productivity", "reporting period", note=avg_tasks_comment),
+        build_kpi("Picks per Person per Hour", picks_per_hour, metric_lookup["Picks per Person per Hour"].formula, "employee_productivity", "reporting period", note=picks_comment),
+        build_kpi("Error Rate %", error_rate, metric_lookup["Error Rate %"].formula, "employee_productivity", "reporting period", note=error_comment),
+        build_kpi("Rework Rate %", rework_rate, metric_lookup["Rework Rate %"].formula, "employee_productivity", "reporting period", note=rework_comment),
+        build_kpi("Overtime %", overtime, metric_lookup["Overtime %"].formula, "employee_productivity", "reporting period", note=overtime_comment),
+        build_kpi("Average Tasks per Employee", avg_tasks, metric_lookup["Average Tasks per Employee"].formula, "employee_productivity", "reporting period", note=avg_tasks_comment),
     ]
-    return {"name": "Employee Productivity", "kpis": kpis}
+
+    drilldowns = _build_section_drilldowns(
+        section_name="Employee Productivity",
+        drilldown_df=_prepare_employee_productivity_drilldown_df(df),
+        metric_specs=metric_specs,
+        applied_filters=_serialize_filters(start=start, end=end, warehouses=warehouses, sku_families=None),
+    )
+    return _section_payload("Employee Productivity", kpis, drilldowns)
 
 
 def compute_all_kpis(
@@ -602,31 +987,16 @@ def compute_all_kpis(
     warehouses: Optional[Sequence[str]] = None,
     sku_families: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Dict], List[Dict]]:
-    # ================================
-    # Function: compute_all_kpis
-    # Purpose: Computes every KPI section and flattens the result into a table.
-    # Inputs:
-    #   - datasets (Dict[str, pd.DataFrame]): all loaded source datasets
-    #   - start (pd.Timestamp)
-    #   - end (pd.Timestamp)
-    #   - warehouses (Optional[Sequence[str]]): warehouse scope
-    #   - sku_families (Optional[Sequence[str]]): SKU-family scope
-    # Output:
-    #   - Tuple[List[Dict], List[Dict]] of section results and flat KPI table
-    # Important Logic:
-    #   - Builds a part-number scope from inventory when SKU filtering must be
-    #     propagated into source tables that do not store `sku_family`
-    # ================================
     allowed_parts = None
     if sku_families:
         inventory = datasets["inventory_snapshot"]
-        # Inventory is the authoritative source for part-to-family mapping.
         allowed_parts = sorted(
             inventory[inventory["sku_family"].isin(sku_families)]["part_number"].dropna().astype(str).unique().tolist()
         )
+
     sections = [
-        compute_inbound_kpis(datasets["inbound_parts"], start, end, sku_families, allowed_parts),
-        compute_outbound_kpis(datasets["outbound_parts"], start, end, sku_families, allowed_parts),
+        compute_inbound_kpis(datasets["inbound_parts"], datasets["inventory_snapshot"], start, end, sku_families, allowed_parts, warehouses),
+        compute_outbound_kpis(datasets["outbound_parts"], datasets["inventory_snapshot"], start, end, sku_families, allowed_parts, warehouses),
         compute_inventory_kpis(datasets["inventory_snapshot"], datasets["outbound_parts"], start, end, warehouses, sku_families, allowed_parts),
         compute_warehouse_productivity_kpis(datasets["warehouse_productivity"], start, end, warehouses),
         compute_employee_productivity_kpis(datasets["employee_productivity"], start, end, warehouses),
@@ -650,14 +1020,6 @@ def compute_all_kpis(
 
 
 def get_kpi_lookup(sections: List[Dict]) -> Dict[str, Dict]:
-    # ================================
-    # Function: get_kpi_lookup
-    # Purpose: Creates a flat KPI-name lookup for quick access.
-    # Inputs:
-    #   - sections (List[Dict]): KPI sections
-    # Output:
-    #   - Dict[str, Dict] keyed by KPI name
-    # ================================
     lookup = {}
     for section in sections:
         for kpi in section["kpis"]:

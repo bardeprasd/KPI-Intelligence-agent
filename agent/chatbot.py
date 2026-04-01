@@ -76,6 +76,30 @@ DOMAIN_ALIASES = {
     "employee": "Employee Productivity",
     "employee productivity": "Employee Productivity",
 }
+DRILLDOWN_ALIASES = {
+    "warehouse": "by_warehouse",
+    "warehouses": "by_warehouse",
+    "sku family": "by_sku_family",
+    "sku families": "by_sku_family",
+    "part number": "by_part_number",
+    "part": "by_part_number",
+    "sku": "by_part_number",
+    "employee": "by_employee",
+    "supplier": "by_supplier",
+    "customer": "by_customer",
+    "date": "by_date",
+    "day": "by_date",
+    "week": "by_date",
+    "month": "by_date",
+}
+TIME_GRAIN_ALIASES = {
+    "day": "day",
+    "daily": "day",
+    "week": "week",
+    "weekly": "week",
+    "month": "month",
+    "monthly": "month",
+}
 # Only these KPIs can be recomputed at warehouse scope from the source data.
 WAREHOUSE_AWARE_KPIS = {
     "Days of Supply",
@@ -134,6 +158,7 @@ class KPIChatbot:
         self.memory = ChatMemory(last_warehouses=list(warehouse_scope or []))
         self.sections = {section["name"]: section for section in payload["sections"]}
         self.kpi_lookup = {kpi["name"]: kpi for section in payload["sections"] for kpi in section["kpis"]}
+        self.kpi_to_section = {kpi["name"]: section["name"] for section in payload["sections"] for kpi in section["kpis"]}
         # Build the list of warehouses once so later comparisons and validation
         # can reuse a consistent set of supported IDs.
         self.available_warehouses = sorted(
@@ -227,6 +252,8 @@ class KPIChatbot:
         warehouses = self._extract_warehouses(lower)
         domain = self._detect_domain(lower)
         kpi = self._detect_kpi(lower)
+        drilldown = self._detect_drilldown(lower)
+        time_grain = self._detect_time_grain(lower)
 
         if lower in {"help", "menu", "what can you do?", "what can you do", "examples"}:
             return self._help_text()
@@ -240,6 +267,21 @@ class KPIChatbot:
             return self._recommendation_text()
         if any(term in lower for term in ["kpis", "available metrics", "list metrics"]):
             return self._list_kpis_text(domain)
+
+        drilldown_intent = (" by " in lower) or ("drill" in lower) or any(
+            term in lower for term in ["which warehouse", "which sku family", "which part", "which employee", "causing", "driver"]
+        )
+        if drilldown and drilldown_intent and (kpi or domain):
+            response = self._drilldown_response(
+                kpi=kpi,
+                domain=domain,
+                drilldown_id=drilldown,
+                warehouses=warehouses,
+                time_grain=time_grain,
+                lower_question=lower,
+            )
+            self._remember(question, response, kpi=kpi, domain=domain, warehouses=warehouses)
+            return response
 
         # Follow-up prompts such as "How about WH-03?" inherit the last KPI when
         # the current question only changes the warehouse context.
@@ -630,6 +672,83 @@ class KPIChatbot:
                 match = match.replace("WH", "WH-")
             normalized.append(match)
         return [warehouse for warehouse in normalized if warehouse in self.available_warehouses]
+
+    def _detect_drilldown(self, lower_question: str) -> Optional[str]:
+        for alias, drilldown_id in sorted(DRILLDOWN_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+            if alias in lower_question:
+                return drilldown_id
+        return None
+
+    def _detect_time_grain(self, lower_question: str) -> Optional[str]:
+        for alias, grain in TIME_GRAIN_ALIASES.items():
+            if alias in lower_question:
+                return grain
+        return None
+
+    def _drilldown_response(
+        self,
+        *,
+        kpi: Optional[str],
+        domain: Optional[str],
+        drilldown_id: str,
+        warehouses: Sequence[str],
+        time_grain: Optional[str],
+        lower_question: str,
+    ) -> str:
+        target_domain = self.kpi_to_section.get(kpi) if kpi else domain
+        if not target_domain:
+            target_domain = domain
+        if not target_domain or target_domain not in self.sections:
+            return "Specify a KPI section or KPI name for the drill-down, for example 'show stockout exposure by SKU family'."
+
+        drilldown = self.sections[target_domain].get("drilldowns", {}).get(drilldown_id)
+        if not drilldown:
+            return f"{target_domain} does not expose a {drilldown_id.replace('_', ' ')} drill-down in the current payload."
+        if not drilldown.get("available"):
+            return f"{target_domain} {drilldown.get('label', drilldown_id)} is unavailable: {drilldown.get('unavailable_reason', 'dimension not present in source data')}."
+
+        active_table = drilldown
+        grain_label = ""
+        if drilldown_id == "by_date":
+            selected_grain = time_grain or "day"
+            grain_tables = drilldown.get("grain_tables", {})
+            active_table = grain_tables.get(selected_grain, drilldown)
+            grain_label = f" ({selected_grain})"
+
+        rows = list(active_table.get("rows", []))
+        if warehouses and "warehouse_id" in active_table.get("group_by", []):
+            rows = [row for row in rows if row.get("warehouse_id") in warehouses]
+
+        if kpi:
+            rows = [row for row in rows if kpi in row.get("metrics", {})]
+        if not rows:
+            scope_text = f" for {', '.join(warehouses)}" if warehouses else ""
+            kpi_text = f" for {kpi}" if kpi else ""
+            return f"No {target_domain} {drilldown.get('label', drilldown_id)} rows are available{scope_text}{kpi_text} in the current reporting scope."
+
+        if kpi:
+            if any(term in lower_question for term in ["causing", "driver", "drivers", "cause"]):
+                ranked = sorted(rows, key=lambda item: item["metrics"][kpi]["value"], reverse=True)
+                top_row = ranked[0]
+                dimension_text = ", ".join(f"{column}={top_row.get(column)}" for column in active_table.get("group_by", []))
+                metric = top_row["metrics"][kpi]
+                return (
+                    f"Top driver for {kpi} in {target_domain}{grain_label} is {dimension_text}: "
+                    f"{metric['display_value']} ({metric['status']})."
+                )
+
+            formatted_rows = []
+            for row in rows[:10]:
+                dimension_text = ", ".join(f"{column}={row.get(column)}" for column in active_table.get("group_by", []))
+                metric = row["metrics"][kpi]
+                formatted_rows.append(f"{dimension_text}: {metric['display_value']} ({metric['status']})")
+            return f"{target_domain} {kpi} by {drilldown.get('label', drilldown_id)}{grain_label}: " + "; ".join(formatted_rows)
+
+        preview_rows = []
+        for row in rows[:5]:
+            dimension_text = ", ".join(f"{column}={row.get(column)}" for column in active_table.get("group_by", []))
+            preview_rows.append(dimension_text)
+        return f"{target_domain} {drilldown.get('label', drilldown_id)}{grain_label} is available for {self.payload['reporting_period']['label']}. Example rows: " + "; ".join(preview_rows)
 
     def _detect_domain(self, lower_question: str) -> Optional[str]:
         # ================================
