@@ -2,7 +2,7 @@
   "header": {
     "title": "Aftersales Operations KPI Intelligence Summary",
     "subtitle": "Executive view across inbound, outbound, inventory, warehouse, and workforce performance",
-    "generated_at": "2026-03-31T15:35:27.001408+00:00",
+    "generated_at": "2026-03-31T16:44:26.945938+00:00",
     "overall_status": "red",
     "warehouse_scope": [
       "All"
@@ -153,7 +153,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Late receipts and quantity discrepancies from Supplier A & Supplier C caused inbound performance failures."
+      "insight": "Late receipts from Supplier A & Supplier C reduced on-time performance; engage supplier recovery on delayed receipts."
     },
     {
       "name": "Outbound",
@@ -238,7 +238,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Backorders on MN-5544 and late shipments on SO20092 & SO20124 severely impacted outbound fill rate and OTIF."
+      "insight": "MN-5544 backorders impacted fill rate; review fulfillment and replenishment priorities."
     },
     {
       "name": "Inventory",
@@ -336,7 +336,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "CL-7781 at WH-02 faces critical stock-out risk with low safety stock coverage and high aged inventory."
+      "insight": "CL-7781 stock-out risk at WH-02; trigger targeted expedite or stock rebalance."
     },
     {
       "name": "Warehouse Productivity",
@@ -421,7 +421,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "WH-03 Night shift underperforms on throughput and SLA adherence despite adequate equipment utilization."
+      "insight": "WH-03 Night shift throughput is below plan; rebalance labor or maintenance windows."
     },
     {
       "name": "Employee Productivity",
@@ -493,7 +493,7 @@
         }
       ],
       "risk_level": "red",
-      "insight": "Day shift errors from employee E-1107 and high overtime for E-1068 indicate staffing and quality issues."
+      "insight": "Day shift errors from E-1107; add shift-level coaching or staffing support."
     }
   ],
   "kpi_table": [
@@ -829,11 +829,11 @@
     }
   ],
   "insights": [
-    "Inbound: Supplier A & Supplier C delays and discrepancies reduced on-time receipts to 0%.",
-    "Outbound: MN-5544 backorders at 17.9% lowered fill rate to 82.1%, below 95% target.",
-    "Inventory: CL-7781 stock-out exposure at 53.2% and safety stock coverage at 60.5% at WH-02 are critical.",
-    "Warehouse Productivity: WH-03 Night shift lines picked per labor-hour at 7.34 is half the 14.0 target.",
-    "Employee Productivity: Day shift error rate at 1.6% exceeds 1.0% target, driven by E-1107."
+    "Inbound: Late receipts from Supplier A & Supplier C reduced on-time performance; engage supplier capacity or recovery planning.",
+    "Outbound: MN-5544 backorders impacted fill rate; review safety stock and order-priority settings.",
+    "Inventory: CL-7781 stock-out risk at WH-02; trigger expedite or rebalance inventory.",
+    "Warehouse Productivity: WH-03 Night shift throughput is below plan; rebalance labor or maintenance windows.",
+    "Employee: Day shift errors from E-1107; add refresher training or staffing support."
   ],
   "risks": [
     "Late inbound receipts are increasing the risk of continued outbound service misses.",
@@ -841,11 +841,11 @@
     "Inventory coverage gaps may continue to drive stockouts and service degradation."
   ],
   "recommendations": [
-    "Inbound: Engage Supplier A & Supplier C to reduce late receipts and quantity mismatches.",
-    "Outbound: Prioritize fulfillment and replenishment for MN-5544 to reduce backorders.",
-    "Inventory: Expedite or rebalance stock for CL-7781 at WH-02 to mitigate stock-out risk.",
-    "Warehouse Productivity: Rebalance labor or adjust maintenance on WH-03 Night shift to improve throughput and SLA adherence.",
-    "Employee Productivity: Provide coaching or staffing support for E-1107 and manage overtime for E-1068."
+    "Escalate late suppliers and expedite open receipt lines tied to service-risk parts.",
+    "Prioritize the SKUs driving backorders and clear the most delayed customer orders first.",
+    "Recalibrate reorder points and safety stock for the highest-risk SKUs and constrained warehouses.",
+    "Address the weakest warehouse throughput driver before adding broader process redesign.",
+    "Target the highest-error shift or employee cluster with training and overtime relief."
   ],
   "metadata": {
     "source_files": [
@@ -865,7 +865,7 @@
     "warehouse_filter": null,
     "sku_family_filter": null,
     "calculation_version": "v1.0.0",
-    "narrative_generation": "llm_refined",
+    "narrative_generation": "deterministic",
     "risk_generation": "deterministic",
     "generated_files": [
       "leadership_summary.json",

@@ -1,124 +1,31 @@
-# One-Pager Layout
 
-## Design Goal
-Provide a single-page executive summary that can be scanned in under two minutes while still allowing operations leaders to identify the most urgent issues and next actions.
+# One-Page Leadership Summary — Layout
 
-## Page Structure
+**Header:** Period, Warehouses, Status (Green/Amber/Red)
 
-### 1. Header
-**Placement:** top of page, full width  
-**Fields:**
-- title: `Aftersales Operations KPI Intelligence Summary`
-- subtitle: `Deterministic monthly leadership view across inbound, outbound, inventory, warehouse, and workforce performance`
-- reporting period
-- warehouse scope
-- generated timestamp
-- overall status badge
+**Top Summary (3–5 KPIs):** Fill Rate %, OTIF %, Days of Supply, Lines Picked/Hour, Error Rate %
 
-### 2. Executive Summary Cards
-**Placement:** below header, single row of 5 cards  
-**Recommended cards:**
-1. Fill Rate %
-2. OTIF %
-3. Days of Supply
-4. Lines Picked per Labor-Hour
-5. Error Rate %
+**Sections (tiles):**
+1. Inbound — Avg lead time, % on-time receipts, % discrepancy, Risks/Actions
+2. Outbound — Fill rate, OTIF, Backorder rate, Top SKUs by backorder
+3. Inventory — DOS, % stock-outs, Aged value, Risks/Actions
+4. Warehouse Productivity — Lines/hour, Orders/day, SLA adherence
+5. Employee Productivity — Picks/person/hour, Error rate, Overtime %
 
-**Card fields:**
-- KPI label
-- current value
-- target
-- status color
-- one short note
+## Tabular KPI Summary (example — Feb 2026)
 
-## 3. Functional Sections
-Two-column grid, compact card layout.
+| KPI | Current | Target | Delta | Status | Comment |
+|---|---:|---:|---:|:---:|---|
+| Fill Rate % | 87.8 | 95.0 | -7.2 | AMBER | BR-2208 backorders impacted fill rate |
+| OTIF % | 60.0 | 92.0 | -32.0 | RED | Late shipments on SO20002 & SO20005 |
+| Days of Supply (AX family) | 30 | 25 | +5 | GREEN | Healthy for AX-4312 |
+| Lines Picked per Labor-Hour | 6.1 | 6.0 | +0.1 | GREEN | Slightly above target |
+| Error Rate % | 0.5 | 0.8 | +0.3 | GREEN | Within tolerance |
 
-### Inbound Section
-Display:
-- Average Inbound Lead Time
-- Receipts On-Time %
-- Quantity Discrepancy %
-- Inbound Volume
-- section insight
-- section risk level
+## Insights & Recommended Actions (example)
 
-### Outbound Section
-Display:
-- Fill Rate %
-- OTIF %
-- Backorder Rate %
-- Outbound Volume
-- section insight
-- section risk level
-
-### Inventory Section
-Display:
-- Days of Supply
-- Stockout Exposure %
-- Safety Stock Coverage %
-- Aged Inventory % (>180d)
-- section insight
-- section risk level
-
-### Warehouse Productivity Section
-Display:
-- Lines Picked per Labor-Hour
-- Orders Processed per Labor-Hour
-- SLA Adherence %
-- Equipment Utilization %
-- section insight
-- section risk level
-
-### Employee Productivity Section
-Display:
-- Picks per Person per Hour
-- Error Rate %
-- Rework Rate %
-- Overtime %
-- section insight
-- section risk level
-
-## 4. KPI Summary Table
-**Placement:** bottom half of page, full width  
-**Columns:**
-- KPI
-- Domain
-- Value
-- Unit
-- Target
-- Status
-- Trend / note
-
-The table should be sortable in future digital implementations, but static and compact in the assignment output.
-
-## 5. Insights, Risks, and Recommendations
-**Placement:** bottom of page, 3-column block or stacked sections  
-**Content:**
-- Top 3 insights
-- Top 3 operational risks
-- Top 3 recommended actions
-
-Each bullet should be short and action-oriented.
-
-## 6. Visual Guidelines
-- Keep the page limited to one screen / one printable page where possible
-- Use status colors consistently: green, amber, red
-- Use concise metric formatting
-- Avoid dense narrative paragraphs
-- Favor operational language over technical jargon
-
-## 7. Example Narrative Placement
-- `Insight:` Service performance is under target, driven by low OTIF and elevated backorders.
-- `Risk:` Inventory stockout exposure is contributing to customer service risk.
-- `Recommendation:` Rebalance safety stock for high-backorder SKUs and review late-shipment causes by warehouse.
-
-## 8. Mapping to Output Contract
-| Layout Region | JSON Section |
-|---|---|
-| Header | `header`, `reporting_period` |
-| Summary cards | `summary_cards` |
-| Functional cards | `sections` |
-| KPI table | `kpi_table` |
-| Insights / risks / recommendations | `insights`, `recommendations` |
-| Footer / audit | `metadata`, `audit` |
+- **Inbound:** Supplier B late on PO10002; engage supplier for capacity plan.
+- **Outbound:** BR-2208 is driving backorders; review safety stock/reorder point.
+- **Inventory:** ZX-9910 stock-out risk at WH-02; trigger expedite.
+- **Warehouse Productivity:** Equipment utilization 78–84%; schedule maintenance window.
+- **Employee:** Night shift errors from E-1003; add refresher training.

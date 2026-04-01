@@ -1,96 +1,40 @@
-# Requirements
 
-## 1. Functional Requirements
-1. Load all provided CSV datasets from the configured data directory.
-2. Validate each source for required columns, parseable dates, and basic numeric integrity.
-3. Support filtering by reporting start date, end date, and optional warehouse list.
-4. Compute deterministic KPIs across:
-   - inbound
-   - outbound
-   - inventory
-   - warehouse productivity
-   - employee productivity
-5. Assign each KPI a target and health status.
-6. Generate a one-page leadership summary with summary cards and section-level detail.
-7. Produce structured JSON output matching the published schema.
-8. Export a readable Excel workbook suitable for review.
-9. Optionally render a lightweight HTML one-pager.
-10. Record metadata including source file names, row counts, validation warnings, and calculation version.
+# Requirements — AI Agent & Consolidated Leadership View
 
-## 2. Non-Functional Requirements
-### Auditability
-- Every KPI must have an explicit formula and source mapping.
-- Narrative insights must be deterministic and reproducible.
-- Outputs must include assumptions and validation warnings.
+## 1. Introduction & Objectives
+Provide a single consolidated leadership summary across inbound, outbound, inventory, warehouse and employee productivity, with drill-down potential and narrative insights.
 
-### Maintainability
-- Code must be modular and readable.
-- Business thresholds must be config-driven.
-- Domain logic must be isolated from exporters.
+## 2. Scope
+- **Datasets:** inbound_parts, outbound_parts, inventory_snapshot, warehouse_productivity, employee_productivity.
+- **Warehouses:** Multi-warehouse, global-ready (IDs and names as attributes).
 
-### Reproducibility
-- Running the agent on the same data and parameters should reproduce the same outputs.
-- Default reporting window logic must be consistent and explainable.
+## 3. Users & Personas
+- **Leadership:** VP/Director Aftersales, Operations Head.
+- **Analytics/Ops:** Build, validate, and interpret KPIs.
 
-### Performance
-- Should complete quickly on assignment-scale CSV data.
-- Design should be extensible to moderate warehouse analytics volumes through chunking or database pushdown in future iterations.
+## 4. Functional Requirements
+- Ingest CSV/DB/API sources on a scheduled cadence.
+- Compute KPI dictionary deterministically with traceable formulas.
+- Generate a one-page summary (Excel/HTML/JSON) per period and warehouse set.
+- Optional NL Q&A over computed data (post-MVP).
 
-### Extensibility
-- New KPI domains should be addable without rewriting orchestration.
-- New output channels should be addable without changing KPI logic.
-- New data connectors should be swappable into the ingestion layer.
+## 5. Non-Functional Requirements
+- **Performance:** Monthly refresh < 10 minutes for 2 years data, 10 warehouses, 50k SKUs.
+- **Security:** No PII; role-based access to outputs; file-system and DB credentials via secrets.
+- **Auditability:** Every KPI shows source table, period filter, and calculation notes.
 
-## 3. Validation Requirements
-1. Required columns must exist for every dataset.
-2. Date columns must parse successfully.
-3. Key identifier fields must not be entirely null.
-4. Numeric quantity fields should be coerced safely to numeric types.
-5. Negative quantities, invalid percentages, or date anomalies should generate warnings.
-6. Division-by-zero scenarios must be handled gracefully.
-7. Validation failures for missing critical columns should stop the run with a clear error.
+## 6. Data Governance & Quality
+- Schema validation; type checks; non-null checks for keys and dates.
+- Outlier detection on lead time, fill rate; missing values flagged.
 
-## 4. Output Requirements
-### JSON
-The JSON output must include:
-- header
-- reporting_period
-- summary_cards
-- sections
-- kpi_table
-- insights
-- recommendations
-- metadata
-- audit
+## 7. Assumptions & Constraints
+- Initial sources provided as CSV extracts; later DB/API connectors.
+- Costs/COGS not included in sample; may be joined from Finance later.
 
-### Excel
-Workbook should include:
-- KPI summary view
-- section detail view
-- insights and actions
-- metadata / audit view
+## 8. Risks & Mitigations
+- **Inconsistent definitions** → Maintain KPI dictionary as source of truth.
+- **Data latency** → Timestamp all extracts; alert on staleness.
+- **Model drift (LLM)** → Keep deterministic fallback summaries.
 
-### HTML
-A compact executive one-pager should present:
-- reporting header
-- summary KPI cards
-- domain sections
-- insight / risk / action bullets
-- KPI table
-
-## 5. Scalability Considerations
-1. Replace CSV ingestion with database or API connectors for production.
-2. Push heavy aggregations into SQL or Spark when data volume grows.
-3. Persist curated marts to avoid repeated cleansing on every run.
-4. Add scheduled runs and artifact versioning.
-5. Add partitioned processing by reporting period and warehouse.
-
-## 6. Auditability Considerations
-1. Keep KPI formulas in code and documentation aligned.
-2. Include target thresholds in config rather than hardcoding throughout the codebase.
-3. Keep calculation version in metadata.
-4. Store validation warnings in output payload and run summary.
-5. Treat narrative generation as derived commentary, never as a substitute for calculation logic.
-
-## 7. Deterministic vs AI-Led Behavior
-This solution qualifies as an AI-agent style workflow because it orchestrates ingestion, validation, reasoning over KPIs, and recommendation generation. However, it intentionally uses deterministic business logic for all measurable outputs. Any future LLM use must remain optional, bounded, and non-authoritative for KPI math.
+## 9. Create a single page visual using python
+- Using the output result, create a report to showcase the result visually usin one_pager_layout.md file
