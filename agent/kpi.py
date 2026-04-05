@@ -21,6 +21,8 @@ MetricCalculator = Callable[[pd.DataFrame], float]
 
 @dataclass(frozen=True)
 class MetricSpec:
+    # Declarative KPI spec so the same metric can be reused in top-level
+    # sections, grouped drill-downs, and traceability output.
     name: str
     formula: str
     source_table: str
@@ -28,6 +30,7 @@ class MetricSpec:
 
 
 def safe_divide(numerator: float, denominator: float) -> float:
+    # KPI math should never fail on empty or zero-denominator slices.
     return float(numerator / denominator) if denominator not in (0, 0.0) else 0.0
 
 
@@ -56,6 +59,7 @@ def filter_sku_families(
 
 
 def evaluate_status(value: float, threshold: KPIThreshold) -> str:
+    # Convert raw KPI values into leadership-friendly traffic-light status.
     if threshold.direction == "info" or threshold.target is None:
         return "info"
     if threshold.direction == "ge":
@@ -119,6 +123,8 @@ def _top_labels(series: pd.Series, count: int = 2) -> List[str]:
 
 
 def _generic_comment(value: float, threshold: KPIThreshold) -> str:
+    # Fallback narrative used when the section cannot name a concrete business
+    # driver such as a supplier, SKU, warehouse, employee, or shift.
     status = evaluate_status(value, threshold)
     if threshold.direction == "info" or threshold.target is None:
         return "Informational KPI"
@@ -153,6 +159,7 @@ def build_kpi(
     note: str = "",
     display_override: Optional[str] = None,
 ) -> Dict:
+    # Canonical KPI object shared by summaries, exports, drill-downs, and chat.
     threshold = THRESHOLDS[name]
     return {
         "name": name,
@@ -170,6 +177,8 @@ def build_kpi(
 
 
 def _inventory_part_mapping(inventory: pd.DataFrame, column: str) -> Dict[str, str]:
+    # Inventory is the only dataset that reliably carries SKU-family style
+    # attributes, so inbound/outbound rows borrow that mapping by part number.
     if "part_number" not in inventory.columns or column not in inventory.columns:
         return {}
     mapping_source = inventory[["part_number", column]].dropna().drop_duplicates()
@@ -255,6 +264,7 @@ def _serialize_filters(
 
 
 def _metric_snapshot(spec: MetricSpec, frame: pd.DataFrame, grain: str) -> Dict:
+    # Reuse the same MetricSpec logic when computing grouped drill-down rows.
     value = float(spec.compute(frame))
     return build_kpi(
         name=spec.name,
@@ -274,6 +284,8 @@ def build_raw_detail(
     sort_by: Sequence[str],
     logic_note: str,
 ) -> Dict:
+    # Preserve the exact scoped records behind a section so downstream HTML and
+    # audit consumers can trace each KPI back to raw rows.
     columns = [column for column in RAW_DETAIL_COLUMNS[section_name] if column in df.columns]
     scoped = df.copy()
     available_sort = [column for column in sort_by if column in scoped.columns]
@@ -338,6 +350,8 @@ def _build_drilldown_rows(
     drilldown_id: str,
     label: str,
 ) -> Dict:
+    # Generic grouped drill-down builder. It applies the exact same KPI
+    # formulas to each group so grouped views stay consistent with top-level KPIs.
     missing = [column for column in group_by if column not in df.columns]
     if missing:
         return _build_drilldown_unavailable(
@@ -425,6 +439,8 @@ def build_time_grain_drilldown(
     applied_filters: Dict[str, object],
     label: str,
 ) -> Dict:
+    # Time drill-down exposes the same metric set at day/week/month grain from
+    # one logical definition so consumers can pivot by period without new math.
     if date_column not in df.columns:
         return _build_drilldown_unavailable(
             drilldown_id=drilldown_id,
@@ -498,6 +514,8 @@ def build_ranked_text_drilldown(
     ranked_series: pd.Series,
     logic_note: str,
 ) -> Dict:
+    # Some "top N" KPIs are narrative/ranked outputs rather than thresholded
+    # performance KPIs, so they are represented as informational ranking rows.
     rows: List[Dict] = []
     for rank, (dimension_value, metric_value) in enumerate(ranked_series.items(), start=1):
         rows.append({
@@ -538,6 +556,7 @@ def build_ranked_text_drilldown(
 
 
 def _inbound_metric_specs() -> List[MetricSpec]:
+    # Formal KPI definitions for inbound operations.
     return [
         MetricSpec("Average Inbound Lead Time", "AVG(inbound_lead_time_days)", "inbound_parts", lambda frame: frame["inbound_lead_time_days"].mean() if not frame.empty else 0.0),
         MetricSpec("Receipts On-Time %", "COUNT(received_date <= expected_date) / COUNT(*)", "inbound_parts", lambda frame: float((frame["received_date"] <= frame["expected_date"]).mean()) if not frame.empty else 0.0),
@@ -548,6 +567,7 @@ def _inbound_metric_specs() -> List[MetricSpec]:
 
 
 def _outbound_metric_specs() -> List[MetricSpec]:
+    # Formal KPI definitions for outbound service and fulfillment.
     return [
         MetricSpec("Fill Rate %", "SUM(qty_shipped) / SUM(qty_ordered)", "outbound_parts", lambda frame: safe_divide(frame["qty_shipped"].sum(), frame["qty_ordered"].sum())),
         MetricSpec("OTIF %", "SUM(otif_flag) / COUNT(*)", "outbound_parts", lambda frame: float(frame["otif_flag"].mean()) if not frame.empty else 0.0),
@@ -558,6 +578,7 @@ def _outbound_metric_specs() -> List[MetricSpec]:
 
 
 def _inventory_metric_specs() -> List[MetricSpec]:
+    # Formal KPI definitions for inventory health and aging.
     return [
         MetricSpec("Days of Supply", "AVG(days_of_supply)", "inventory_snapshot", lambda frame: frame["days_of_supply"].mean() if not frame.empty else 0.0),
         MetricSpec("Stockout Exposure %", "SUM(stockout_flag) / COUNT(*)", "inventory_snapshot", lambda frame: float(frame["stockout_flag"].mean()) if not frame.empty else 0.0),
@@ -568,6 +589,7 @@ def _inventory_metric_specs() -> List[MetricSpec]:
 
 
 def _warehouse_productivity_metric_specs() -> List[MetricSpec]:
+    # Formal KPI definitions for warehouse throughput and service execution.
     return [
         MetricSpec("Lines Picked per Labor-Hour", "SUM(lines_picked) / SUM(labor_hours)", "warehouse_productivity", lambda frame: safe_divide(frame["lines_picked"].sum(), frame["labor_hours"].sum())),
         MetricSpec("Orders Processed per Labor-Hour", "SUM(orders_processed) / SUM(labor_hours)", "warehouse_productivity", lambda frame: safe_divide(frame["orders_processed"].sum(), frame["labor_hours"].sum())),
@@ -579,6 +601,7 @@ def _warehouse_productivity_metric_specs() -> List[MetricSpec]:
 
 
 def _employee_productivity_metric_specs() -> List[MetricSpec]:
+    # Formal KPI definitions for labor productivity and quality.
     return [
         MetricSpec("Picks per Person per Hour", "SUM(picks) / SUM(hours_worked)", "employee_productivity", lambda frame: safe_divide(frame["picks"].sum(), frame["hours_worked"].sum())),
         MetricSpec("Error Rate %", "SUM(errors) / SUM(tasks_completed)", "employee_productivity", lambda frame: safe_divide(frame["errors"].sum(), frame["tasks_completed"].sum())),
@@ -595,6 +618,8 @@ def _build_section_drilldowns(
     metric_specs: Sequence[MetricSpec],
     applied_filters: Dict[str, object],
 ) -> Dict[str, Dict]:
+    # Section drill-downs are configuration-driven so dimensions can be added
+    # in config without rewriting each section calculator.
     config = DRILLDOWN_CONFIG[section_name]
     source_dataset = str(config["source_dataset"])
     dimensions = config["dimensions"]  # type: ignore[assignment]
@@ -626,6 +651,7 @@ def _build_section_drilldowns(
 
 
 def _attach_raw_detail(kpis: List[Dict], raw_detail: Dict) -> None:
+    # Every KPI in a section points to the same scoped raw-detail payload.
     for kpi in kpis:
         kpi["raw_detail"] = raw_detail
 
@@ -639,9 +665,13 @@ def compute_inbound_kpis(
     allowed_parts: Optional[Sequence[str]] = None,
     warehouses: Optional[Sequence[str]] = None,
 ) -> Dict:
+    # Inbound is network-level in the source data, so warehouse filters are only
+    # carried for traceability and do not slice the underlying rows.
     df = filter_period(inbound, "received_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
     df = df.copy()
+    # Store a reusable flag so raw detail and grouped views can expose the
+    # on-time receipt logic explicitly.
     df["receipt_on_time_flag"] = (df["received_date"] <= df["expected_date"]).astype(int)
     metric_specs = _inbound_metric_specs()
     metric_lookup = {spec.name: spec for spec in metric_specs}
@@ -659,6 +689,8 @@ def compute_inbound_kpis(
         .sort_values(ascending=False)
         .head(5)
     )
+    # Prefer comments that name a concrete supplier problem over generic status
+    # wording because leadership action is easier when the likely driver is known.
     top_delaying_suppliers = (
         ", ".join(f"{supplier} ({int(volume):,})" for supplier, volume in late_supplier_volume.items())
         if not late_supplier_volume.empty
@@ -740,9 +772,12 @@ def compute_outbound_kpis(
     allowed_parts: Optional[Sequence[str]] = None,
     warehouses: Optional[Sequence[str]] = None,
 ) -> Dict:
+    # Outbound is also network-level in the current source model; warehouse
+    # scope is preserved in metadata but does not slice the transactional rows.
     df = filter_period(outbound, "shipped_date", start, end)
     df = filter_sku_families(df, sku_families, allowed_parts)
     df = df.copy()
+    # Expose lateness explicitly for raw detail and downstream drill-down use.
     df["late_shipment_flag"] = (df["shipped_date"] > df["promise_date"]).astype(int)
     metric_specs = _outbound_metric_specs()
     metric_lookup = {spec.name: spec for spec in metric_specs}
@@ -759,6 +794,8 @@ def compute_outbound_kpis(
         .sort_values(ascending=False)
         .head(10)
     )
+    # When possible, comments point to concrete impacted SKUs or orders rather
+    # than generic threshold text.
     backorder_sku_display = (
         ", ".join(f"{part} ({int(qty):,})" for part, qty in top_backorder_skus.items())
         if not top_backorder_skus.empty
@@ -852,10 +889,14 @@ def compute_inventory_kpis(
     sku_families: Optional[Sequence[str]] = None,
     allowed_parts: Optional[Sequence[str]] = None,
 ) -> Dict:
+    # Inventory is warehouse-aware, so warehouse filters are applied directly to
+    # the snapshot rows before KPI calculation.
     df = filter_period(inventory, "snapshot_date", start, end)
     df = filter_warehouses(df, warehouses)
     df = filter_sku_families(df, sku_families)
     df = df.copy()
+    # Materialize this flag once so it can be reused in raw detail and grouped
+    # views without re-expressing the comparison logic elsewhere.
     df["below_safety_stock_flag"] = (df["available_qty"] < df["safety_stock"]).astype(int)
     outbound_df = filter_period(outbound, "shipped_date", start, end)
     outbound_df = filter_sku_families(outbound_df, sku_families, allowed_parts)
@@ -869,6 +910,8 @@ def compute_inventory_kpis(
     avg_age = metric_lookup["Average Inventory Age"].compute(df)
 
     periods_in_month = max(end.days_in_month, 1)
+    # Inventory turns is a proxy in this assignment: shipped quantity is used as
+    # issue velocity because richer finance valuation data is not available.
     avg_daily_issues = safe_divide(outbound_df["qty_shipped"].sum(), periods_in_month)
     avg_on_hand = float(df["on_hand_qty"].mean()) if not df.empty else 0.0
     inventory_turns = safe_divide(avg_daily_issues * 365, avg_on_hand)
@@ -881,6 +924,7 @@ def compute_inventory_kpis(
         aged_inventory_value = float(df.loc[df["age_days"] > 180, "on_hand_qty"].mul(df.loc[df["age_days"] > 180, "unit_cost"]).sum())
         aged_value_note = "Computed from on_hand_qty * unit_cost for inventory older than 180 days."
     else:
+        # Fall back to an operational quantity proxy when financial valuation is missing.
         aged_inventory_value = float(df.loc[df["age_days"] > 180, "on_hand_qty"].sum()) if not df.empty else 0.0
         aged_value_note = "Proxy uses aged on-hand quantity because unit_cost is not present in the current data model."
     turns_note = "Proxy uses annualized shipped quantity over average on-hand quantity because finance valuation fields are not present."
@@ -954,6 +998,8 @@ def compute_warehouse_productivity_kpis(
     end: pd.Timestamp,
     warehouses: Optional[Sequence[str]] = None,
 ) -> Dict:
+    # Warehouse productivity is naturally warehouse-grained, so this section
+    # supports both network-wide and scoped warehouse views.
     df = filter_period(warehouse_df, "date", start, end)
     df = filter_warehouses(df, warehouses)
     metric_specs = _warehouse_productivity_metric_specs()
@@ -968,6 +1014,8 @@ def compute_warehouse_productivity_kpis(
 
     weakest_shift_row = None
     if not df.empty:
+        # Use the weakest shift as the comment driver so narrative points to an
+        # operationally actionable bottleneck.
         weakest_shift_row = df.assign(
             lines_per_hour_row=df["lines_picked"] / df["labor_hours"].replace(0, pd.NA),
             orders_per_hour_row=df["orders_processed"] / df["labor_hours"].replace(0, pd.NA),
@@ -1022,6 +1070,8 @@ def compute_employee_productivity_kpis(
     end: pd.Timestamp,
     warehouses: Optional[Sequence[str]] = None,
 ) -> Dict:
+    # Employee productivity is warehouse-aware and can be recomputed for chatbot
+    # comparisons at narrower scope.
     df = filter_period(employee_df, "date", start, end)
     df = filter_warehouses(df, warehouses)
     metric_specs = _employee_productivity_metric_specs()
@@ -1035,6 +1085,8 @@ def compute_employee_productivity_kpis(
 
     top_error_row = None
     if not df.empty:
+        # Surface the highest-error employee/shift combination when present so
+        # the note is more actionable than a generic "red" explanation.
         error_rows = df.loc[df["errors"] > 0].sort_values(["errors", "rework", "overtime_hours"], ascending=[False, False, False])
         if not error_rows.empty:
             top_error_row = error_rows.iloc[0]
@@ -1090,8 +1142,12 @@ def compute_all_kpis(
     warehouses: Optional[Sequence[str]] = None,
     sku_families: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Dict], List[Dict]]:
+    # Aggregate all business domains into one nested section payload plus one
+    # flat table payload for summary/export use.
     allowed_parts = None
     if sku_families:
+        # Inbound/outbound datasets may not carry sku_family directly, so derive
+        # the allowed part universe from inventory before applying family scope.
         inventory = datasets["inventory_snapshot"]
         allowed_parts = sorted(
             inventory[inventory["sku_family"].isin(sku_families)]["part_number"].dropna().astype(str).unique().tolist()
